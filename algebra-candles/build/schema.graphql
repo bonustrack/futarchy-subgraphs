@@ -1,0 +1,25 @@
+type Pool @entity {
+  id: ID!                   # Pool Address
+  token0: Bytes!
+  token1: Bytes!
+  decimal0: BigInt!
+  decimal1: BigInt!
+  lastPrice: BigDecimal!    # The absolute latest price (Live Price)
+  tick: BigInt!
+  timestamp: BigInt!        # Last update timestamp
+}
+
+type Candle @entity {
+  id: ID!                   # Format: "poolAddress-hourID"
+  pool: Pool!
+  periodStartUnix: Int!     # Timestamp of the hour start (e.g. 1678000000)
+  
+  open: BigDecimal!         # Price before the first swap of the hour
+  high: BigDecimal!         # Highest price during the hour
+  low: BigDecimal!          # Lowest price during the hour
+  close: BigDecimal!        # Price after the last swap of the hour
+  
+  volumeToken0: BigDecimal!
+  volumeToken1: BigDecimal!
+  txCount: BigInt!
+}

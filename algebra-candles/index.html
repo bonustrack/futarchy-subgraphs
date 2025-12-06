@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Algebra Subgraph Candles</title>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #111; color: #eee; margin: 0; padding: 20px; }
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
+        input { padding: 8px; border-radius: 4px; border: 1px solid #444; background: #222; color: white; width: 350px; }
+        button { padding: 8px 16px; border-radius: 4px; border: none; cursor: pointer; background: #2962ff; color: white; font-weight: bold; }
+        button:hover { background: #1e4bd8; }
+        button.secondary { background: #444; }
+        #chart { width: 100%; height: 600px; border: 1px solid #333; }
+        .status { color: #888; font-size: 0.9em; margin-left: auto; }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <input type="text" id="poolAddress" value="0x462bb6bb0261b2159b0e3cc763a1499e29afc1f8" placeholder="Pool Address">
+        <button onclick="loadData()">Load Data</button>
+        <button class="secondary" id="invertBtn" onclick="toggleInvert()">Invert Price: OFF</button>
+        <span class="status" id="status">Ready</span>
+    </div>
+
+    <div id="chart"></div>
+
+    <script>
+        const CHART_CONTAINER = document.getElementById('chart');
+        const SUBGRAPH_URL = "https://api.studio.thegraph.com/query/1718249/algebra-candles/v0.0.1";
+        
+        // Initialize Chart
+        const chart = LightweightCharts.createChart(CHART_CONTAINER, {
+            layout: { background: { type: 'solid', color: '#111' }, textColor: '#DDD' },
+            grid: { vertLines: { color: '#333' }, horzLines: { color: '#333' } },
+            crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+            timeScale: { timeVisible: true, secondsVisible: false },
+        });
+
+        const candleSeries = chart.addCandlestickSeries({
+            upColor: '#26a69a', downColor: '#ef5350', borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350'
+        });
+
+        let RAW_DATA = [];
+        let IS_INVERTED = false;
+
+        async function loadData() {
+            const address = document.getElementById('poolAddress').value.toLowerCase();
+            const statusFn = (msg) => document.getElementById('status').innerText = msg;
+            
+            statusFn("Loading...");
+            
+            const query = `
+            {
+                candles(
+                    where: { pool: "${address}" }
+                    orderBy: periodStartUnix
+                    orderDirection: asc
+                    first: 1000
+                ) {
+                    periodStartUnix
+                    open
+                    high
+                    low
+                    close
+                }
+            }`;
+
+            try {
+                const res = await fetch(SUBGRAPH_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+
+                const json = await res.json();
+                
+                if (json.errors) throw new Error(JSON.stringify(json.errors));
+                if (!json.data || !json.data.candles || json.data.candles.length === 0) {
+                    statusFn("No data found for this pool.");
+                    return;
+                }
+
+                RAW_DATA = json.data.candles.map(c => ({
+                    time: c.periodStartUnix,
+                    open: parseFloat(c.open),
+                    high: parseFloat(c.high),
+                    low: parseFloat(c.low),
+                    close: parseFloat(c.close)
+                }));
+
+                renderChart();
+                statusFn(`Loaded ${RAW_DATA.length} candles.`);
+
+            } catch (err) {
+                console.error(err);
+                statusFn("Error loading data.");
+            }
+        }
+
+        function toggleInvert() {
+            IS_INVERTED = !IS_INVERTED;
+            document.getElementById('invertBtn').innerText = `Invert Price: ${IS_INVERTED ? 'ON' : 'OFF'}`;
+            renderChart();
+        }
+
+        function renderChart() {
+            if (RAW_DATA.length === 0) return;
+
+            const data = RAW_DATA.map(d => {
+                if (IS_INVERTED) {
+                    // Invert: 1/x
+                    // IMPORTANT: When inverting, High becomes 1/Low and Low becomes 1/High
+                    return {
+                        time: d.time,
+                        open: 1 / d.open,
+                        high: 1 / d.low,  // Swap High/Low
+                        low: 1 / d.high,  // Swap High/Low
+                        close: 1 / d.close
+                    };
+                }
+                return d;
+            });
+
+            candleSeries.setData(data);
+            chart.timeScale().fitContent();
+        }
+
+        // Auto-load on start
+        loadData();
+
+        // Resize observer
+        new ResizeObserver(entries => {
+            if (entries.length === 0 || entries[0].target !== CHART_CONTAINER) { return; }
+            const newRect = entries[0].contentRect;
+            chart.applyOptions({ height: newRect.height, width: newRect.width });
+        }).observe(CHART_CONTAINER);
+
+    </script>
+</body>
+</html>

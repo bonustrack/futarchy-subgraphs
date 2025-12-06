@@ -1,0 +1,25 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: AlgebraPool
+    network: gnosis
+    source:
+      address: "0x462BB6bB0261B2159b0e3cc763a1499e29afc1F8"
+      abi: AlgebraPool
+      startBlock: 43468000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Pool
+        - Candle
+      abis:
+        - name: AlgebraPool
+          file: ./abis/AlgebraPool.json
+      eventHandlers:
+        - event: Swap(indexed address,indexed address,int256,int256,uint160,uint128,int24)
+          handler: handleSwap
+      file: ./src/mapping.ts
