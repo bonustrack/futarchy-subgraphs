@@ -3,12 +3,32 @@ schema:
   file: ./schema.graphql
 dataSources:
   - kind: ethereum
+    name: AlgebraFactory
+    network: gnosis
+    source:
+      address: "0xa0864cca6e114013ab0e27cbd5b6f4c8947da766"
+      abi: AlgebraFactory
+      startBlock: 42000000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Pool
+      abis:
+        - name: AlgebraFactory
+          file: ./abis/AlgebraFactory.json
+      eventHandlers:
+        - event: Pool(indexed address,indexed address,address)
+          handler: handlePoolCreated
+      file: ./src/mapping.ts
+
+templates:
+  - kind: ethereum/contract
     name: AlgebraPool
     network: gnosis
     source:
-      address: "0x462BB6bB0261B2159b0e3cc763a1499e29afc1F8"
       abi: AlgebraPool
-      startBlock: 43468000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7

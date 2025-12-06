@@ -1,17 +1,23 @@
 // Node 22+ has native fetch, no need to require node-fetch
 // const fetch = require('node-fetch'); 
 
-const SUBGRAPH_URL = "https://api.studio.thegraph.com/query/1718249/algebra-candles/v0.0.1";
+const SUBGRAPH_URL = "https://api.studio.thegraph.com/query/1718249/algebra-candles/v0.0.3";
 
 const QUERY = `
 {
-  pool(id: "0x462bb6bb0261b2159b0e3cc763a1499e29afc1F8") {
+  pools(first: 5, orderBy: timestamp, orderDirection: desc) {
+    id
+    timestamp
+    lastPrice
+    tick
+  }
+  pool(id: "0x36d46321ca07e822a6b71e31046dbb4a6f09e415") {
     id
     lastPrice
     tick
     timestamp
   }
-  candles(first: 5, orderBy: periodStartUnix, orderDirection: desc) {
+  candles(first: 5, orderBy: periodStartUnix, orderDirection: desc, where: { pool: "0x36d46321ca07e822a6b71e31046dbb4a6f09e415" }) {
     periodStartUnix
     open
     high
