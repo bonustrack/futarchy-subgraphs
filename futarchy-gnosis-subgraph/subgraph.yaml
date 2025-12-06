@@ -1,0 +1,53 @@
+specVersion: 1.0.0
+schema:
+  file: ./schema.graphql
+dataSources:
+  # 1. Futarchy Factory
+  - kind: ethereum
+    name: FutarchyFactory
+    network: gnosis
+    source:
+      address: "0xa6cB18FCDC17a2B44E5cAd2d80a6D5942d30a345"
+      abi: FutarchyFactory
+      startBlock: 40000000 
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Proposal
+        - TokenLookup
+      abis:
+        - name: FutarchyFactory
+          file: ./abis/FutarchyFactory.json
+        - name: FutarchyProposal
+          file: ./abis/FutarchyProposal.json
+        - name: AlgebraFactory
+          file: ./abis/AlgebraFactory.json
+      eventHandlers:
+        - event: NewProposal(indexed address,string,bytes32,bytes32)
+          handler: handleNewProposal
+      file: ./src/mapping.ts
+
+  # 2. Algebra Factory (To detect pool creation)
+  - kind: ethereum
+    name: AlgebraFactory
+    network: gnosis
+    source:
+      address: "0xA0864cCA6E114013AB0e27cbd5B6f4c8947da766"
+      abi: AlgebraFactory
+      startBlock: 40000000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Proposal
+        - TokenLookup
+      abis:
+        - name: AlgebraFactory
+          file: ./abis/AlgebraFactory.json
+      eventHandlers:
+        - event: Pool(indexed address,indexed address,address)
+          handler: handlePoolCreated
+      file: ./src/mapping.ts

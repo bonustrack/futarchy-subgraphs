@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Futarchy Gnosis Explorer</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-color: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.3);
+            --success: #4ade80;
+            --border: rgba(148, 163, 184, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            background-image:
+                radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.15) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0 0 10px 0;
+            letter-spacing: -0.05em;
+        }
+
+        p.subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .controls {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(12px);
+            margin-bottom: 30px;
+            display: flex;
+            gap: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            flex-direction: column;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border);
+            padding: 12px 16px;
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+        }
+
+        button {
+            background: var(--accent-color);
+            color: #0f172a;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1rem;
+            white-space: nowrap;
+        }
+
+        button.search-btn {
+            background: var(--success);
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px var(--accent-glow);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 30px;
+            align-items: start;
+        }
+
+        .market-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 70vh;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .market-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            backdrop-filter: blur(12px);
+        }
+
+        .market-card:hover {
+            border-color: var(--accent-color);
+            transform: translateX(4px);
+        }
+
+        .market-card.active {
+            border-color: var(--accent-color);
+            background: rgba(56, 189, 248, 0.1);
+        }
+
+        .market-title {
+            font-weight: 700;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .market-date {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .detail-view {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 40px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            min-height: 400px;
+        }
+
+        .empty-state {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+        }
+
+        .section-title {
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .data-label {
+            color: var(--text-secondary);
+        }
+
+        .data-value {
+            font-family: 'SF Mono', 'Roboto Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+
+        .address {
+            color: var(--accent-color);
+        }
+
+        .address.missing {
+            color: #ef4444;
+            /* Red for missing pools */
+        }
+
+        .tag {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin-right: 8px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Futarchy Gnosis Explorer</h1>
+            <p class="subtitle">Search and visualize proposals and their liquidity pools</p>
+        </header>
+
+        <div class="controls">
+            <div class="control-row">
+                <input type="text" id="subgraphUrl" placeholder="Enter Subgraph Query URL"
+                    value="https://api.studio.thegraph.com/query/1718249/futarchy-gnosis-100/version/latest">
+                <button onclick="fetchProposals()">Refresh</button>
+            </div>
+            <div class="control-row" style="margin-top: 10px;">
+                <input type="text" id="searchInput" placeholder="Search by Market Name (e.g. '130 sDAI')"
+                    onkeypress="handleEnter(event)">
+                <button class="search-btn" onclick="fetchProposals()">Search</button>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="market-list" id="marketList">
+                <!-- Market cards will go here -->
+            </div>
+
+            <div class="detail-view" id="detailView">
+                <div class="empty-state">Select a proposal to view details</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const DEFAULT_URL = "https://api.studio.thegraph.com/query/1718249/futarchy-gnosis-100/version/latest";
+
+        // Auto-load on startup
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchProposals();
+        });
+
+        function handleEnter(e) {
+            if (e.key === 'Enter') fetchProposals();
+        }
+
+        async function fetchProposals() {
+            const urlInput = document.getElementById('subgraphUrl');
+            // Update input value if it's the old default
+            if (urlInput.value && urlInput.value.includes('v1.0.0')) {
+                urlInput.value = DEFAULT_URL;
+            }
+
+            const url = urlInput.value || DEFAULT_URL;
+            const searchText = document.getElementById('searchInput').value.trim();
+            const btn = document.querySelector('.search-btn');
+
+            // Build Query
+            let whereClause = "";
+            if (searchText) {
+                whereClause = `where: { marketName_contains: "${searchText}" }`;
+            }
+
+            const query = `
+            {
+                proposals(
+                    first: 50, 
+                    orderBy: createdAtTimestamp, 
+                    orderDirection: desc
+                    ${whereClause}
+                ) {
+                    id
+                    marketName
+                    createdAtTimestamp
+                    collateralToken1
+                    collateralToken2
+                    outcomeYesCompany
+                    outcomeNoCompany
+                    outcomeYesCurrency
+                    outcomeNoCurrency
+                    poolConditionalYes
+                    poolConditionalNo
+                    poolExpectedValueYes
+                    poolExpectedValueNo
+                    poolPredictionYes
+                    poolPredictionNo
+                }
+            }`;
+
+            const originalText = btn.textContent;
+            btn.textContent = 'Loading...';
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+
+                const json = await response.json();
+
+                if (json.errors) {
+                    console.error("GraphQL Errors:", json.errors);
+                    alert('GraphQL Error: ' + json.errors[0].message);
+                    return;
+                }
+
+                if (!json.data || !json.data.proposals) {
+                    console.error("Unexpected response structure:", json);
+                    alert('Error: Unexpected response format from Subgraph');
+                    return;
+                }
+
+                renderList(json.data.proposals);
+            } catch (error) {
+                console.error("Network/Fetch Error:", error);
+                alert('Network Error fetching data. Check console details.');
+            } finally {
+                btn.textContent = originalText;
+            }
+        }
+
+        function renderList(proposals) {
+            const list = document.getElementById('marketList');
+            list.innerHTML = '';
+
+            if (!proposals || proposals.length === 0) {
+                list.innerHTML = '<div style="padding:20px; text-align:center; color:#94a3b8;">No proposals found.</div>';
+                return;
+            }
+
+            proposals.forEach(p => {
+                const el = document.createElement('div');
+                el.className = 'market-card';
+                const date = new Date(p.createdAtTimestamp * 1000).toLocaleDateString();
+                el.innerHTML = `
+                    <div class="market-title">${p.marketName}</div>
+                    <div class="market-date">Created: ${date}</div>
+                `;
+                el.onclick = () => {
+                    document.querySelectorAll('.market-card').forEach(c => c.classList.remove('active'));
+                    el.classList.add('active');
+                    renderDetail(p);
+                };
+                list.appendChild(el);
+            });
+        }
+
+        function renderDetail(p) {
+            const view = document.getElementById('detailView');
+
+            const formatAddr = (addr, label) => {
+                if (!addr) return `<span class="data-value address missing">Not Found</span>`;
+                return `<span class="data-value address" title="${addr}">${addr}</span>`;
+            };
+
+            const row = (label, val) => `
+                <div class="data-row">
+                    <span class="data-label">${label}</span>
+                    ${formatAddr(val)}
+                </div>
+            `;
+
+            view.innerHTML = `
+                <h2>${p.marketName}</h2>
+                <div class="tag">ID: ${p.id}</div>
+                
+                <div class="section-title">Tokens</div>
+                ${row("Collateral 1 (Company)", p.collateralToken1)}
+                ${row("Collateral 2 (Currency)", p.collateralToken2)}
+
+                <div class="section-title">Wrapped Outcomes</div>
+                ${row("YES Company", p.outcomeYesCompany)}
+                ${row("NO Company", p.outcomeNoCompany)}
+                ${row("YES Currency", p.outcomeYesCurrency)}
+                ${row("NO Currency", p.outcomeNoCurrency)}
+
+                <div class="section-title">Detected Pools</div>
+                ${row("Conditional YES", p.poolConditionalYes)}
+                ${row("Conditional NO", p.poolConditionalNo)}
+                ${row("Expected Value YES", p.poolExpectedValueYes)}
+                ${row("Expected Value NO", p.poolExpectedValueNo)}
+                ${row("Prediction YES", p.poolPredictionYes)}
+                ${row("Prediction NO", p.poolPredictionNo)}
+            `;
+        }
+
+    </script>
+</body>
+
+</html>

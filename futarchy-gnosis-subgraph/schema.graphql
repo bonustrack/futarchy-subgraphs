@@ -1,0 +1,33 @@
+type Proposal @entity {
+  id: Bytes! # Proposal Address
+  marketName: String!
+  conditionId: Bytes!
+  questionId: Bytes!
+  createdAtTimestamp: BigInt!
+  createdAtBlock: BigInt!
+
+  # Tokens
+  collateralToken1: Bytes! # Company Token
+  collateralToken2: Bytes! # Currency Token
+  
+  # Wrapped Outcomes
+  outcomeYesCompany: Bytes!  # 0
+  outcomeNoCompany: Bytes!   # 1
+  outcomeYesCurrency: Bytes! # 2
+  outcomeNoCurrency: Bytes!  # 3
+
+  # Pools (Populated via Algebra Factory events)
+  poolConditionalYes: Bytes
+  poolConditionalNo: Bytes
+  poolExpectedValueYes: Bytes
+  poolExpectedValueNo: Bytes
+  poolPredictionYes: Bytes
+  poolPredictionNo: Bytes
+}
+
+# Helper to map tokens back to their Proposal
+type TokenLookup @entity {
+  id: Bytes! # Token Address
+  proposal: Proposal!
+  role: String! # e.g. "YES_COMPANY"
+}
