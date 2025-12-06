@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Futarchy Gnosis Explorer</title>
+    <script src="https://unpkg.com/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -15,6 +16,7 @@
             --accent-glow: rgba(56, 189, 248, 0.3);
             --success: #4ade80;
             --border: rgba(148, 163, 184, 0.1);
+            --modal-bg: #1e293b;
         }
 
         body {
@@ -107,6 +109,16 @@
 
         button.search-btn {
             background: var(--success);
+        }
+
+        button.secondary {
+            background: #444;
+            color: white;
+        }
+
+        button.active {
+            background: var(--success);
+            color: #0f172a;
         }
 
         button:hover {
@@ -211,6 +223,15 @@
             color: var(--accent-color);
         }
 
+        .address.clickable {
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .address.clickable:hover {
+            text-shadow: 0 0 8px var(--accent-color);
+        }
+
         .address.missing {
             color: #ef4444;
             /* Red for missing pools */
@@ -222,6 +243,126 @@
             border-radius: 4px;
             font-size: 0.8rem;
             margin-right: 8px;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal {
+            background: var(--modal-bg);
+            width: 90%;
+            max-width: 1000px;
+            height: 80vh;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .close-btn {
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-btn:hover {
+            color: var(--accent-color);
+            background: transparent;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .modal-body {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .visualizer-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        #chart-container {
+            flex: 1;
+            width: 100%;
+            min-height: 0;
+            /* Important for flex child with chart */
+            border: 1px solid var(--border);
+        }
+
+        #object-visualizer {
+            flex: 1;
+            width: 100%;
+            background: #0f172a;
+            padding: 15px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            white-space: pre-wrap;
+            color: #a5d6ff;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            display: none;
+        }
+
+        /* JSON Syntax Highlighting */
+        .json-key {
+            color: #79c0ff;
+        }
+
+        .json-string {
+            color: #a5d6ff;
+        }
+
+        .json-number {
+            color: #d2a8ff;
+        }
+
+        .json-boolean {
+            color: #ff7b72;
+        }
+
+        .json-null {
+            color: #79c0ff;
         }
 
         /* Scrollbar */
@@ -271,10 +412,40 @@
         </div>
     </div>
 
+    <!-- Visualization Modal -->
+    <div class="modal-overlay" id="visualizerModal" onclick="if(event.target === this) closeModal()">
+        <div class="modal">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title">Pool Visualizer</div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px;" id="modalPoolAddr">
+                    </div>
+                </div>
+                <button class="close-btn" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="visualizer-controls">
+                    <button id="btn-chart" class="active" onclick="setMode('chart')">Chart</button>
+                    <button id="btn-obj" class="secondary" onclick="setMode('object')">JSON</button>
+                    <button class="secondary" id="invertBtn" onclick="toggleInvert()">Invert Price: OFF</button>
+                    <span id="visualizerStatus"
+                        style="margin-left: auto; color: var(--text-secondary); align-self: center;">Ready</span>
+                </div>
+
+                <div id="chart-container"></div>
+                <div id="object-visualizer"></div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const DEFAULT_URL = "https://api.studio.thegraph.com/query/1718249/futarchy-gnosis-100/version/latest";
+        const CANDLES_URL = "https://api.studio.thegraph.com/query/1718249/algebra-candles/v0.0.3";
 
-        // Auto-load on startup
+        // -----------------------
+        // Main App Logic
+        // -----------------------
+
         window.addEventListener('DOMContentLoaded', () => {
             fetchProposals();
         });
@@ -285,16 +456,13 @@
 
         async function fetchProposals() {
             const urlInput = document.getElementById('subgraphUrl');
-            // Update input value if it's the old default
             if (urlInput.value && urlInput.value.includes('v1.0.0')) {
                 urlInput.value = DEFAULT_URL;
             }
-
             const url = urlInput.value || DEFAULT_URL;
             const searchText = document.getElementById('searchInput').value.trim();
             const btn = document.querySelector('.search-btn');
 
-            // Build Query
             let whereClause = "";
             if (searchText) {
                 whereClause = `where: { marketName_contains: "${searchText}" }`;
@@ -339,21 +507,18 @@
                 const json = await response.json();
 
                 if (json.errors) {
-                    console.error("GraphQL Errors:", json.errors);
                     alert('GraphQL Error: ' + json.errors[0].message);
                     return;
                 }
-
                 if (!json.data || !json.data.proposals) {
-                    console.error("Unexpected response structure:", json);
                     alert('Error: Unexpected response format from Subgraph');
                     return;
                 }
 
                 renderList(json.data.proposals);
             } catch (error) {
-                console.error("Network/Fetch Error:", error);
-                alert('Network Error fetching data. Check console details.');
+                console.error(error);
+                alert('Network Error. Check console.');
             } finally {
                 btn.textContent = originalText;
             }
@@ -390,13 +555,24 @@
 
             const formatAddr = (addr, label) => {
                 if (!addr) return `<span class="data-value address missing">Not Found</span>`;
+                // Check if it's a pool address (label starting with 'Pool' or 'Conditional'/'Expected'/'Prediction')
+                // Actually the label passed to row() is just the text. 
+                // We'll rely on the fact that if it's one of the pool fields, we render it clickable.
+                // But this helper is generic. Let's make it clickable if it looks like a pool field?
+                // Better yet, just check if it's a valid address and we are in the pool section.
+                // For simplicity, I'll pass a flag.
                 return `<span class="data-value address" title="${addr}">${addr}</span>`;
             };
 
-            const row = (label, val) => `
+            const formatPool = (addr) => {
+                if (!addr) return `<span class="data-value address missing">Not Found</span>`;
+                return `<span class="data-value address clickable" title="Click to visualize" onclick="openPoolVisualizer('${addr}')">${addr} 📊</span>`;
+            };
+
+            const row = (label, val, isPool = false) => `
                 <div class="data-row">
                     <span class="data-label">${label}</span>
-                    ${formatAddr(val)}
+                    ${isPool ? formatPool(val) : formatAddr(val)}
                 </div>
             `;
 
@@ -415,13 +591,200 @@
                 ${row("NO Currency", p.outcomeNoCurrency)}
 
                 <div class="section-title">Detected Pools</div>
-                ${row("Conditional YES", p.poolConditionalYes)}
-                ${row("Conditional NO", p.poolConditionalNo)}
-                ${row("Expected Value YES", p.poolExpectedValueYes)}
-                ${row("Expected Value NO", p.poolExpectedValueNo)}
-                ${row("Prediction YES", p.poolPredictionYes)}
-                ${row("Prediction NO", p.poolPredictionNo)}
+                ${row("Conditional YES", p.poolConditionalYes, true)}
+                ${row("Conditional NO", p.poolConditionalNo, true)}
+                ${row("Expected Value YES", p.poolExpectedValueYes, true)}
+                ${row("Expected Value NO", p.poolExpectedValueNo, true)}
+                ${row("Prediction YES", p.poolPredictionYes, true)}
+                ${row("Prediction NO", p.poolPredictionNo, true)}
             `;
+        }
+
+
+        // -----------------------
+        // Visualizer Logic
+        // -----------------------
+        let chart;
+        let candleSeries;
+        let RAW_DATA = [];
+        let IS_INVERTED = false;
+        let VIEW_MODE = 'chart';
+        let CURRENT_POOL = null;
+
+        function closeModal() {
+            document.getElementById('visualizerModal').style.display = 'none';
+        }
+
+        function openPoolVisualizer(poolAddr) {
+            CURRENT_POOL = poolAddr;
+            document.getElementById('visualizerModal').style.display = 'flex';
+            document.getElementById('modalPoolAddr').innerText = poolAddr;
+
+            // Init chart if not exists
+            if (!chart) initChart();
+
+            // Re-render empty or load data
+            loadCandleData(poolAddr);
+        }
+
+        function initChart() {
+            const container = document.getElementById('chart-container');
+            chart = LightweightCharts.createChart(container, {
+                layout: { background: { type: 'solid', color: '#1e293b' }, textColor: '#ccc' }, // Matched modal bg
+                grid: { vertLines: { color: '#334155' }, horzLines: { color: '#334155' } },
+                crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                timeScale: { timeVisible: true, secondsVisible: false },
+                autoSize: true, // Auto resize with container
+            });
+
+            candleSeries = chart.addCandlestickSeries({
+                upColor: '#4ade80', downColor: '#ef4444',
+                borderVisible: false, wickUpColor: '#4ade80', wickDownColor: '#ef4444',
+                priceFormat: { type: 'price', precision: 8, minMove: 0.00000001 },
+            });
+
+            // Resize observer
+            new ResizeObserver(entries => {
+                if (entries.length === 0 || entries[0].target !== container) { return; }
+                const newRect = entries[0].contentRect;
+                chart.applyOptions({ height: newRect.height, width: newRect.width });
+            }).observe(container);
+        }
+
+        async function loadCandleData(address) {
+            const statusFn = (msg) => document.getElementById('visualizerStatus').innerText = msg;
+            statusFn("Loading...");
+
+            // Reset Data
+            RAW_DATA = [];
+            candleSeries.setData([]);
+            document.getElementById('object-visualizer').innerHTML = '';
+
+            const query = `
+            {
+                candles(
+                    where: { pool: "${address.toLowerCase()}" }
+                    orderBy: periodStartUnix
+                    orderDirection: asc
+                    first: 1000
+                ) {
+                    periodStartUnix
+                    open
+                    high
+                    low
+                    close
+                    volumeToken0
+                }
+            }`;
+
+            try {
+                const res = await fetch(CANDLES_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+
+                const json = await res.json();
+
+                if (json.errors) throw new Error(json.errors[0].message);
+                if (!json.data || !json.data.candles || json.data.candles.length === 0) {
+                    statusFn("No candle data found for this pool.");
+                    return;
+                }
+
+                // Process Data
+                RAW_DATA = json.data.candles.map(c => ({
+                    time: Number(c.periodStartUnix),
+                    open: parseFloat(c.open),
+                    high: parseFloat(c.high),
+                    low: parseFloat(c.low),
+                    close: parseFloat(c.close),
+                    volume: parseFloat(c.volumeToken0)
+                }));
+
+                statusFn(`Loaded ${RAW_DATA.length} candles.`);
+                updateVisualizerView();
+
+            } catch (err) {
+                console.error(err);
+                statusFn("Error loading data.");
+            }
+        }
+
+        function setMode(mode) {
+            VIEW_MODE = mode;
+            document.getElementById('btn-obj').className = mode === 'object' ? 'active' : 'secondary';
+            document.getElementById('btn-chart').className = mode === 'chart' ? 'active' : 'secondary';
+
+            document.getElementById('chart-container').style.display = mode === 'chart' ? 'block' : 'none';
+            document.getElementById('object-visualizer').style.display = mode === 'object' ? 'block' : 'none';
+
+            updateVisualizerView();
+        }
+
+        function toggleInvert() {
+            IS_INVERTED = !IS_INVERTED;
+            document.getElementById('invertBtn').innerText = `Invert Price: ${IS_INVERTED ? 'ON' : 'OFF'}`;
+            updateVisualizerView();
+        }
+
+        function updateVisualizerView() {
+            const data = processData();
+            if (VIEW_MODE === 'object') {
+                renderObjectView(data);
+            } else {
+                renderChartView(data);
+            }
+        }
+
+        function processData() {
+            if (RAW_DATA.length === 0) return [];
+            return RAW_DATA.map(d => {
+                if (IS_INVERTED) {
+                    // Avoid division by zero
+                    if (d.open === 0 || d.high === 0 || d.low === 0 || d.close === 0) return null;
+                    return {
+                        time: d.time,
+                        open: 1 / d.open,
+                        high: 1 / d.low,  // Swap High/Low when inverting
+                        low: 1 / d.high,
+                        close: 1 / d.close,
+                        volume: d.volume
+                    };
+                }
+                return d;
+            }).filter(d => d && d.open !== 0 && d.high !== 0 && d.low !== 0 && d.close !== 0 && isFinite(d.open));
+        }
+
+        function renderChartView(data) {
+            if (!candleSeries) return;
+            candleSeries.setData(data);
+            chart.timeScale().fitContent();
+            chart.priceScale('right').applyOptions({
+                autoScale: true,
+                scaleMargins: {
+                    top: 0.1,
+                    bottom: 0.2,
+                },
+            });
+        }
+
+        function renderObjectView(data) {
+            const jsonStr = JSON.stringify(data, null, 2);
+            document.getElementById('object-visualizer').innerHTML = syntaxHighlight(jsonStr);
+        }
+
+        function syntaxHighlight(json) {
+            json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                var cls = 'json-number';
+                if (/^"/.test(match)) {
+                    if (/:$/.test(match)) { cls = 'json-key'; }
+                    else { cls = 'json-string'; }
+                } else if (/true|false/.test(match)) { cls = 'json-boolean'; }
+                else if (/null/.test(match)) { cls = 'json-null'; }
+                return '<span class="' + cls + '">' + match + '</span>';
+            });
         }
 
     </script>
