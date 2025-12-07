@@ -413,6 +413,8 @@
                     { 
                         proposal(id: "${proposalAddress.toLowerCase()}") { 
                             id, marketName, collateralToken1, collateralToken2, 
+                            poolConditionalYes, poolConditionalNo,
+                            poolExpectedValueYes, poolExpectedValueNo,
                             poolPredictionYes, poolPredictionNo 
                         } 
                     }`);
@@ -501,6 +503,10 @@
                         <div class="data-row"><span class="data-label">Collateral Token 2</span> <span class="data-value">${market.collateralToken2}</span></div>
                         
                         <div class="section-title">Price Pools</div>
+                        <div class="data-row"><span class="data-label">Conditional YES</span> ${formatPool(market.poolConditionalYes)}</div>
+                        <div class="data-row"><span class="data-label">Conditional NO</span> ${formatPool(market.poolConditionalNo)}</div>
+                        <div class="data-row"><span class="data-label">Expected Value YES</span> ${formatPool(market.poolExpectedValueYes)}</div>
+                        <div class="data-row"><span class="data-label">Expected Value NO</span> ${formatPool(market.poolExpectedValueNo)}</div>
                         <div class="data-row"><span class="data-label">Prediction YES</span> ${formatPool(market.poolPredictionYes)}</div>
                         <div class="data-row"><span class="data-label">Prediction NO</span> ${formatPool(market.poolPredictionNo)}</div>
                     ` : `
