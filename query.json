@@ -1,0 +1,3 @@
+{
+    "query": "{ proposals(where: { organization: \"0xe204584feb4564d3891739e395f6d6198f218247\" }) { id displayNameQuestion description } }"
+}

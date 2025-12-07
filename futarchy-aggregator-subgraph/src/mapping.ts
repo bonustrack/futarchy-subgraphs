@@ -1,4 +1,4 @@
-import { Bytes } from "@graphprotocol/graph-ts"
+import { Bytes, BigInt, Address } from "@graphprotocol/graph-ts"
 import { AggregatorMetadataCreated } from "../generated/Creator/Creator"
 import { OrganizationAdded, AggregatorInfoUpdated } from "../generated/templates/AggregatorTemplate/Aggregator"
 import { ProposalAdded, CompanyInfoUpdated } from "../generated/templates/OrganizationTemplate/Organization"
@@ -54,18 +54,44 @@ export function handleOrganizationAdded(event: OrganizationAdded): void {
     entity.owner = ownerCall.reverted ? event.transaction.from : ownerCall.value
 
     entity.save()
+
+    // 3. Backfill existing proposals (Addressing the race condition)
+    let countCall = contract.try_getProposalsCount()
+    if (!countCall.reverted) {
+        let count = countCall.value
+        if (count > BigInt.fromI32(0)) {
+            let proposalsCall = contract.try_getProposals(BigInt.fromI32(0), count)
+            if (!proposalsCall.reverted) {
+                let proposalAddresses = proposalsCall.value
+                for (let i = 0; i < proposalAddresses.length; i++) {
+                    let items = proposalAddresses[i]
+                    createProposalHelper(items, event.params.organizationMetadata, event.block.timestamp, event.transaction.from)
+                }
+            }
+        }
+    }
 }
 
 export function handleProposalAdded(event: ProposalAdded): void {
-    // 1. Start indexing the new Proposal contract
-    ProposalTemplate.create(event.params.proposalMetadata)
+    createProposalHelper(event.params.proposalMetadata, event.address, event.block.timestamp, event.transaction.from)
+}
 
-    let entity = new Proposal(event.params.proposalMetadata.toHexString())
-    entity.organization = event.address.toHexString() // Link to parent Organization
-    entity.createdAt = event.block.timestamp
+function createProposalHelper(proposalAddress: Bytes, organizationAddress: Bytes, timestamp: BigInt, txFrom: Bytes): void {
+    let id = proposalAddress.toHexString()
+    let entity = Proposal.load(id)
 
-    // 2. Fetch details from the new contract
-    let contract = ProposalContract.bind(event.params.proposalMetadata)
+    // Ensure template is created
+    ProposalTemplate.create(Address.fromBytes(proposalAddress))
+
+    if (entity == null) {
+        entity = new Proposal(id)
+        entity.createdAt = timestamp
+    }
+
+    entity.organization = organizationAddress.toHexString()
+
+    // Fetch details
+    let contract = ProposalContract.bind(Address.fromBytes(proposalAddress))
 
     let qCall = contract.try_displayNameQuestion()
     entity.displayNameQuestion = qCall.reverted ? "" : qCall.value
@@ -80,12 +106,10 @@ export function handleProposalAdded(event: ProposalAdded): void {
     entity.proposalAddress = addrCall.reverted ? Bytes.empty() : addrCall.value
 
     let ownerCall = contract.try_owner()
-    entity.owner = ownerCall.reverted ? event.transaction.from : ownerCall.value
+    entity.owner = ownerCall.reverted ? txFrom : ownerCall.value
 
     entity.save()
 }
-
-// --- Update Handlers ---
 
 export function handleAggregatorUpdated(event: AggregatorInfoUpdated): void {
     let entity = Aggregator.load(event.address.toHexString())
