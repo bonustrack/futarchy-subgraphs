@@ -1,0 +1,30 @@
+type Aggregator @entity {
+  id: ID! # Contract Address
+  name: String!
+  description: String
+  creator: Bytes!
+  txHash: Bytes!
+  createdAt: BigInt!
+  organizations: [Organization!]! @derivedFrom(field: "aggregator")
+}
+
+type Organization @entity {
+  id: ID! # Contract Address
+  aggregator: Aggregator!
+  name: String!
+  description: String
+  owner: Bytes!
+  createdAt: BigInt!
+  proposals: [Proposal!]! @derivedFrom(field: "organization")
+}
+
+type Proposal @entity {
+  id: ID! # Metadata Contract Address
+  organization: Organization!
+  displayNameQuestion: String
+  displayNameEvent: String
+  description: String
+  proposalAddress: Bytes! # The logic contract address
+  owner: Bytes!
+  createdAt: BigInt!
+}

@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Futarchy Aggregator Explorer</title>
+    <script src="https://unpkg.com/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-color: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.3);
+            --success: #4ade80;
+            --border: rgba(148, 163, 184, 0.1);
+            --modal-bg: #1e293b;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            background-image:
+                radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.15) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0 0 10px 0;
+            letter-spacing: -0.05em;
+        }
+
+        p.subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .breadcrumb {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            font-size: 1rem;
+            color: var(--text-secondary);
+            flex-wrap: wrap;
+        }
+
+        .breadcrumb-item {
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .breadcrumb-item:hover {
+            color: var(--accent-color);
+            text-decoration: underline;
+        }
+
+        .breadcrumb-separator {
+            color: var(--border);
+        }
+
+        .active-crumb {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .card:hover {
+            border-color: var(--accent-color);
+            transform: translateY(-4px);
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .card-desc {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            flex: 1;
+        }
+
+        .card-meta {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 4px 8px;
+            border-radius: 4px;
+            align-self: flex-start;
+            font-family: monospace;
+        }
+
+        .detail-container {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 40px;
+            backdrop-filter: blur(12px);
+        }
+
+        .section-title {
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 0.9rem;
+            font-weight: 700;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 5px;
+        }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .data-label {
+            color: var(--text-secondary);
+        }
+
+        .data-value {
+            font-family: 'SF Mono', 'Roboto Mono', monospace;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+            text-align: right;
+        }
+
+        .address {
+            color: var(--accent-color);
+        }
+
+        .clickable {
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .clickable:hover {
+            text-shadow: 0 0 8px var(--accent-color);
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+        }
+
+        /* Modal Styles (From Reference) */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal {
+            background: var(--modal-bg);
+            width: 90%;
+            max-width: 1000px;
+            height: 80vh;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .close-btn {
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #chart-container {
+            flex: 1;
+            width: 100%;
+            border: 1px solid var(--border);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Futarchy Integrator</h1>
+            <p class="subtitle">Navigate: Aggregator → Organization → Proposal → Market Details</p>
+        </header>
+
+        <div class="breadcrumb" id="breadcrumb">
+            <!-- Dynamic Breadcrumbs -->
+        </div>
+
+        <div id="content-area">
+            <!-- Dynamic Content -->
+        </div>
+    </div>
+
+    <!-- Chart Modal -->
+    <div class="modal-overlay" id="visualizerModal" onclick="if(event.target === this) closeModal()">
+        <div class="modal">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title">Pool Visualizer</div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px;" id="modalPoolAddr">
+                    </div>
+                </div>
+                <button class="close-btn" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="chart-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const AGGREGATOR_SUBGRAPH_URL = "https://api.studio.thegraph.com/query/1718249/futarchy-aggregator-gnosis/v0.0.4";
+        const GNOSIS_SUBGRAPH_URL = "https://api.studio.thegraph.com/query/1718249/futarchy-gnosis-100/version/latest";
+        const CANDLES_SUBGRAPH_URL = "https://api.studio.thegraph.com/query/1718249/algebra-candles/v0.0.3";
+
+        // --- State ---
+        let state = {
+            view: 'aggregators', // aggregators, organizations, proposals, detail
+            path: [], // [{name: 'Aggregators', id: null}, {name: 'My DAO', id: '0x..'}, ...]
+            data: {}
+        };
+
+        // --- Init ---
+        window.addEventListener('DOMContentLoaded', () => {
+            navigateTo('aggregators');
+        });
+
+        // --- Navigation Logic ---
+        function updateBreadcrumb() {
+            const container = document.getElementById('breadcrumb');
+            container.innerHTML = '';
+
+            state.path.forEach((item, index) => {
+                const el = document.createElement('div');
+                el.className = index === state.path.length - 1 ? 'breadcrumb-item active-crumb' : 'breadcrumb-item';
+                el.innerText = item.name;
+                el.onclick = () => navigateTo(item.view, item.id, item.context);
+                container.appendChild(el);
+
+                if (index < state.path.length - 1) {
+                    const sep = document.createElement('div');
+                    sep.className = 'breadcrumb-separator';
+                    sep.innerText = ' / ';
+                    container.appendChild(sep);
+                }
+            });
+        }
+
+        async function navigateTo(view, id = null, context = null) {
+            const content = document.getElementById('content-area');
+            content.innerHTML = '<div class="loading">Loading...</div>';
+
+            try {
+                if (view === 'aggregators') {
+                    state.path = [{ name: 'Aggregators', view: 'aggregators', id: null }];
+                    const data = await fetchAggregators();
+                    renderAggregators(data);
+                } else if (view === 'organizations') {
+                    // Truncate path if going back
+                    const idx = state.path.findIndex(p => p.view === 'organizations' && p.id === id);
+                    if (idx !== -1) state.path = state.path.slice(0, idx + 1);
+                    else state.path.push({ name: context.name, view: 'organizations', id: id, context });
+
+                    const data = await fetchOrganizations(id);
+                    renderOrganizations(data);
+                } else if (view === 'proposals') {
+                    // Go back support
+                    const idx = state.path.findIndex(p => p.view === 'proposals' && p.id === id);
+                    if (idx !== -1) state.path = state.path.slice(0, idx + 1);
+                    else state.path.push({ name: context.name, view: 'proposals', id: id, context });
+
+                    const data = await fetchProposals(id);
+                    renderProposals(data);
+                } else if (view === 'detail') {
+                    // Go back support
+                    const idx = state.path.findIndex(p => p.view === 'detail' && p.id === id);
+                    if (idx !== -1) state.path = state.path.slice(0, idx + 1);
+                    else state.path.push({ name: context.name, view: 'detail', id: id, context });
+
+                    const fullData = await fetchProposalDetail(id, context.proposalAddress);
+                    renderDetail(fullData);
+                }
+
+                state.view = view;
+                updateBreadcrumb();
+            } catch (err) {
+                console.error(err);
+                content.innerHTML = `<div class="loading" style="color:#ef4444">Error: ${err.message}</div>`;
+            }
+        }
+
+        // --- Data Fetching ---
+        async function gql(url, query) {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query })
+            });
+            const json = await res.json();
+            if (json.errors) throw new Error(json.errors[0].message);
+            return json.data;
+        }
+
+        async function fetchAggregators() {
+            const data = await gql(AGGREGATOR_SUBGRAPH_URL, `{ aggregators { id, name, description } }`);
+            return data.aggregators;
+        }
+
+        async function fetchOrganizations(aggregatorId) {
+            const data = await gql(AGGREGATOR_SUBGRAPH_URL, `{ aggregator(id: "${aggregatorId}") { organizations { id, name, description } } }`);
+            return data.aggregator.organizations;
+        }
+
+        async function fetchProposals(orgId) {
+            const data = await gql(AGGREGATOR_SUBGRAPH_URL, `{ organization(id: "${orgId}") { proposals { id, displayNameQuestion, displayNameEvent, description, proposalAddress } } }`);
+            return data.organization.proposals;
+        }
+
+        async function fetchProposalDetail(metadataId, proposalAddress) {
+            // 1. Get metadata detail (already partially have it, but let's refresh)
+            const aggData = await gql(AGGREGATOR_SUBGRAPH_URL, `{ proposal(id: "${metadataId}") { id, displayNameQuestion, displayNameEvent, description, proposalAddress } }`);
+
+            // 2. Get Market details from Gnosis Subgraph using proposalAddress
+            let marketData = null;
+            if (proposalAddress) {
+                try {
+                    const gnosisData = await gql(GNOSIS_SUBGRAPH_URL, `
+                    { 
+                        proposal(id: "${proposalAddress.toLowerCase()}") { 
+                            id, marketName, collateralToken1, collateralToken2, 
+                            poolPredictionYes, poolPredictionNo 
+                        } 
+                    }`);
+                    marketData = gnosisData.proposal;
+                } catch (e) {
+                    console.warn("Could not fetch market data", e);
+                }
+            }
+
+            return { metadata: aggData.proposal, market: marketData };
+        }
+
+        // --- Rendering ---
+        function renderAggregators(list) {
+            const content = document.getElementById('content-area');
+            content.className = 'grid';
+            content.innerHTML = list.map(item => `
+                <div class="card" onclick="navigateTo('organizations', '${item.id}', {name: '${item.name}'})">
+                    <div class="card-title">${item.name}</div>
+                    <div class="card-desc">${item.description || 'No description'}</div>
+                    <div class="card-meta">ID: ${item.id.slice(0, 10)}...</div>
+                </div>
+            `).join('');
+        }
+
+        function renderOrganizations(list) {
+            const content = document.getElementById('content-area');
+            content.className = 'grid';
+            if (list.length === 0) {
+                content.innerHTML = '<div class="loading">No organizations found.</div>';
+                return;
+            }
+            content.innerHTML = list.map(item => `
+                <div class="card" onclick="navigateTo('proposals', '${item.id}', {name: '${item.name}'})">
+                    <div class="card-title">${item.name}</div>
+                    <div class="card-desc">${item.description || 'No description'}</div>
+                    <div class="card-meta">ID: ${item.id.slice(0, 10)}...</div>
+                </div>
+            `).join('');
+        }
+
+        function renderProposals(list) {
+            const content = document.getElementById('content-area');
+            content.className = 'grid';
+            if (list.length === 0) {
+                content.innerHTML = '<div class="loading">No proposals found.</div>';
+                return;
+            }
+            content.innerHTML = list.map(item => `
+                <div class="card" onclick="navigateTo('detail', '${item.id}', {name: 'Proposal', proposalAddress: '${item.proposalAddress}'})">
+                    <div class="card-title">
+                        ${item.displayNameQuestion || 'Untitled'} 
+                        ${item.displayNameEvent ? `<span style="color:#a78bfa"> ${item.displayNameEvent}</span>` : ''}
+                    </div>
+                    <div class="card-desc">${item.description || 'No description'}</div>
+                    <div class="card-meta">ID: ${item.id.slice(0, 8)}...</div>
+                </div>
+            `).join('');
+        }
+
+        function renderDetail({ metadata, market }) {
+            const content = document.getElementById('content-area');
+            content.className = '';
+
+            const formatPool = (addr) => {
+                if (!addr) return '<span class="data-value address" style="color:#ef4444">Not deployed</span>';
+                return `<span class="data-value address clickable" onclick="openChart('${addr}')">${addr} 📊</span>`;
+            };
+
+            content.innerHTML = `
+                <div class="detail-container">
+                    <h1>
+                        ${metadata.displayNameQuestion}
+                        ${metadata.displayNameEvent ? `<span style="color:#a78bfa"> ${metadata.displayNameEvent}</span>` : ''}
+                    </h1>
+                    <p class="subtitle">${metadata.description}</p>
+                    
+                    <div class="section-title">Metadata</div>
+                    <div class="data-row"><span class="data-label">Metadata Contract</span> <span class="data-value">${metadata.id}</span></div>
+                    <div class="data-row"><span class="data-label">Logic Contract</span> <span class="data-value address">${metadata.proposalAddress}</span></div>
+
+                    <div class="section-title">Market Details (from Gnosis Subgraph)</div>
+                    ${market ? `
+                        <div class="data-row"><span class="data-label">Market Name</span> <span class="data-value">${market.marketName}</span></div>
+                        <div class="data-row"><span class="data-label">Collateral Token 1</span> <span class="data-value">${market.collateralToken1}</span></div>
+                        <div class="data-row"><span class="data-label">Collateral Token 2</span> <span class="data-value">${market.collateralToken2}</span></div>
+                        
+                        <div class="section-title">Price Pools</div>
+                        <div class="data-row"><span class="data-label">Prediction YES</span> ${formatPool(market.poolPredictionYes)}</div>
+                        <div class="data-row"><span class="data-label">Prediction NO</span> ${formatPool(market.poolPredictionNo)}</div>
+                    ` : `
+                        <div class="loading" style="padding: 20px 0; text-align: left;">Market data not found on Gnosis Subgraph (not registered yet?)</div>
+                    `}
+                </div>
+            `;
+        }
+
+        // --- Chart Logic ---
+        let chart, candleSeries;
+
+        function closeModal() {
+            document.getElementById('visualizerModal').style.display = 'none';
+        }
+
+        async function openChart(poolAddr) {
+            document.getElementById('visualizerModal').style.display = 'flex';
+            document.getElementById('modalPoolAddr').innerText = poolAddr;
+
+            if (!chart) {
+                const container = document.getElementById('chart-container');
+                chart = LightweightCharts.createChart(container, {
+                    layout: { background: { type: 'solid', color: '#1e293b' }, textColor: '#ccc' },
+                    grid: { vertLines: { color: '#334155' }, horzLines: { color: '#334155' } },
+                    timeScale: { timeVisible: true, secondsVisible: false },
+                    autoSize: true,
+                });
+                candleSeries = chart.addCandlestickSeries({
+                    upColor: '#4ade80', downColor: '#ef4444',
+                    borderVisible: false, wickUpColor: '#4ade80', wickDownColor: '#ef4444',
+                    priceFormat: { type: 'price', precision: 8, minMove: 0.00000001 },
+                });
+            }
+
+            // Load Data
+            try {
+                const query = `{ candles(where: { pool: "${poolAddr.toLowerCase()}" }, orderBy: periodStartUnix, orderDirection: asc, first: 1000) { periodStartUnix, open, high, low, close, volumeToken0 } }`;
+                const data = await gql(CANDLES_SUBGRAPH_URL, query);
+
+                if (!data.candles || data.candles.length === 0) {
+                    alert("No candle data found for this pool.");
+                    candleSeries.setData([]);
+                } else {
+                    const formatted = data.candles.map(c => ({
+                        time: Number(c.periodStartUnix),
+                        open: parseFloat(c.open),
+                        high: parseFloat(c.high),
+                        low: parseFloat(c.low),
+                        close: parseFloat(c.close),
+                    }));
+                    candleSeries.setData(formatted);
+                    chart.timeScale().fitContent();
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Error loading candles");
+            }
+        }
+
+    </script>
+</body>
+
+</html>

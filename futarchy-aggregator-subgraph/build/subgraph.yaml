@@ -1,0 +1,89 @@
+specVersion: 0.0.5
+schema:
+  file: schema.graphql
+dataSources:
+  - kind: ethereum
+    name: Creator
+    network: gnosis
+    source:
+      address: "0x511D18d5567d76bbd20dEaDF4F90CD9f039eEd2D"
+      abi: Creator
+      startBlock: 43517000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Aggregator
+      abis:
+        - name: Creator
+          file: Creator\Creator.json
+        - name: Aggregator
+          file: Creator\Aggregator.json
+      eventHandlers:
+        - event: AggregatorMetadataCreated(indexed address,string)
+          handler: handleAggregatorCreated
+      file: Creator\Creator.wasm
+templates:
+  - kind: ethereum/contract
+    name: AggregatorTemplate
+    network: gnosis
+    source:
+      abi: Aggregator
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Organization
+      abis:
+        - name: Aggregator
+          file: AggregatorTemplate\Aggregator.json
+        - name: Organization
+          file: AggregatorTemplate\Organization.json
+      eventHandlers:
+        - event: OrganizationAdded(indexed address)
+          handler: handleOrganizationAdded
+        - event: AggregatorInfoUpdated(string,string)
+          handler: handleAggregatorUpdated
+      file: Creator\Creator.wasm
+  - kind: ethereum/contract
+    name: OrganizationTemplate
+    network: gnosis
+    source:
+      abi: Organization
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Proposal
+      abis:
+        - name: Organization
+          file: OrganizationTemplate\Organization.json
+        - name: Proposal
+          file: OrganizationTemplate\Proposal.json
+      eventHandlers:
+        - event: ProposalAdded(indexed address)
+          handler: handleProposalAdded
+        - event: CompanyInfoUpdated(string,string)
+          handler: handleOrganizationUpdated
+      file: Creator\Creator.wasm
+  - kind: ethereum/contract
+    name: ProposalTemplate
+    network: gnosis
+    source:
+      abi: Proposal
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Proposal
+      abis:
+        - name: Proposal
+          file: ProposalTemplate\Proposal.json
+      eventHandlers:
+        - event: MetadataUpdated(string,string,string)
+          handler: handleProposalMetadataUpdated
+      file: Creator\Creator.wasm
