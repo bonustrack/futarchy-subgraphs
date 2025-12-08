@@ -9,6 +9,7 @@ type Pool @entity {
   timestamp: BigInt!        # Last update timestamp
 }
 
+
 type Candle @entity {
   id: ID!                   # Format: "poolAddress-hourID"
   pool: Pool!
@@ -22,4 +23,19 @@ type Candle @entity {
   volumeToken0: BigDecimal!
   volumeToken1: BigDecimal!
   txCount: BigInt!
+}
+
+type Trade @entity(immutable: true) {
+  id: Bytes!
+  pool: Pool!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+  sender: Bytes!
+  recipient: Bytes!
+  amount0: BigDecimal!
+  amount1: BigDecimal!
+  price: BigDecimal!
+  liquidity: BigInt!
+  tick: BigInt!
 }

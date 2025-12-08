@@ -8,7 +8,7 @@ dataSources:
     source:
       address: "0xa0864cca6e114013ab0e27cbd5b6f4c8947da766"
       abi: AlgebraFactory
-      startBlock: 42000000
+      startBlock: 40500000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7

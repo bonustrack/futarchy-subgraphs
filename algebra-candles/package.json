@@ -1,6 +1,7 @@
 {
     "name": "algebra-candles",
     "license": "UNLICENSED",
+    "version": "0.0.4",
     "scripts": {
         "codegen": "graph codegen",
         "build": "graph build",

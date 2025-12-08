@@ -2,7 +2,7 @@ import { BigDecimal, BigInt, log, DataSourceContext } from "@graphprotocol/graph
 import { Swap } from "../generated/templates/AlgebraPool/AlgebraPool"
 import { Pool as PoolEvent } from "../generated/AlgebraFactory/AlgebraFactory"
 import { AlgebraPool } from "../generated/templates"
-import { Pool, Candle } from "../generated/schema"
+import { Pool, Candle, Trade } from "../generated/schema"
 
 // Constant: 2^96 as a BigDecimal
 const Q96 = BigDecimal.fromString("79228162514264337593543950336")
@@ -103,4 +103,27 @@ export function handleSwap(event: Swap): void {
     candle.txCount = candle.txCount.plus(BigInt.fromI32(1))
 
     candle.save()
+
+    // 6. Create Trade Entity
+    let tradeId = event.transaction.hash.concatI32(event.logIndex.toI32())
+    let trade = new Trade(tradeId)
+    trade.pool = poolId
+    trade.blockNumber = event.block.number
+    trade.timestamp = event.block.timestamp
+    trade.txHash = event.transaction.hash
+    trade.sender = event.params.sender
+    trade.recipient = event.params.recipient
+
+    // Scale amounts
+    let scaler0 = BigInt.fromI32(10).pow(u8(pool.decimal0.toI32())).toBigDecimal()
+    let scaler1 = BigInt.fromI32(10).pow(u8(pool.decimal1.toI32())).toBigDecimal()
+
+    trade.amount0 = event.params.amount0.toBigDecimal().div(scaler0)
+    trade.amount1 = event.params.amount1.toBigDecimal().div(scaler1)
+
+    trade.price = newPrice
+    trade.liquidity = event.params.liquidity
+    trade.tick = BigInt.fromI32(event.params.tick)
+
+    trade.save()
 }
