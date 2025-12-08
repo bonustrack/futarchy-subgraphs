@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Futarchy COMPLETE Explorer</title>
+    <script src="https://unpkg.com/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #0f172a;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .card {
+            background: #1e293b;
+            padding: 20px;
+            margin: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 1px solid #334155;
+        }
+
+        .card:hover {
+            border-color: #38bdf8;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .tag {
+            background: #334155;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin-right: 5px;
+        }
+
+        .pool-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #333;
+        }
+
+        h1 {
+            color: #38bdf8;
+        }
+
+        .active {
+            color: #4ade80;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Unified Futarchy Explorer (v0.0.3)</h1>
+    <p>NavPath: <span id="nav-path">Home</span></p>
+    <button onclick="loadAggregators()">Home (Aggregators)</button>
+
+    <div id="content" class="grid"></div>
+
+    <script>
+        const API_URL = "https://api.studio.thegraph.com/query/1718249/futarchy-complete/0.0.6";
+
+        async function gql(query) {
+            const res = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query })
+            });
+            const json = await res.json();
+            if (json.errors) {
+                document.getElementById('content').innerText = "Error: " + JSON.stringify(json.errors);
+                throw new Error(json.errors[0].message);
+            }
+            return json.data;
+        }
+
+        async function loadAggregators() {
+            document.getElementById('nav-path').innerText = "Agents";
+            const data = await gql(`{ aggregators { id, name, description, organizations { id } } }`);
+            const html = data.aggregators.map(a => `
+                <div class="card" onclick="loadOrgs('${a.id}', '${a.name}')">
+                    <h3>${a.name}</h3>
+                    <p>${a.description}</p>
+                    <span class="tag">${a.organizations.length} Organizations</span>
+                </div>
+            `).join('');
+            document.getElementById('content').innerHTML = html;
+        }
+
+        async function loadOrgs(aggId, aggName) {
+            document.getElementById('nav-path').innerText = `${aggName} > Organizations`;
+            const data = await gql(`{ aggregator(id: "${aggId}") { organizations { id, name, description, proposals { id } } } }`);
+            const html = data.aggregator.organizations.map(o => `
+                <div class="card" onclick="loadProposals('${o.id}', '${o.name}')">
+                    <h3>${o.name}</h3>
+                    <p>${o.description}</p>
+                    <span class="tag">${o.proposals.length} Proposals</span>
+                </div>
+            `).join('');
+            document.getElementById('content').innerHTML = html;
+        }
+
+        async function loadProposals(orgId, orgName) {
+            document.getElementById('nav-path').innerText = `${orgName} > Proposals`;
+            // Note: We use the unifiedOneStopShop entities linked to the organization
+            const data = await gql(`{ organization(id: "${orgId}") { name, proposals { id, title, description, marketName, displayNameEvent, displayNameQuestion, 
+                poolConditionalYes { id currentPrice } 
+            } } }`);
+
+            const html = data.organization.proposals.map(p => `
+                <div class="card" onclick="loadDetail('${p.id}')">
+                    <h3>${p.displayNameEvent || p.title}</h3>
+                    <p style="color:#aaa">${p.displayNameQuestion}</p>
+                    <hr style="border-color:#333"/>
+                    <p style="font-size:0.8em; color:#888">Market: ${p.marketName}</p>
+                    <p>Price: ${p.poolConditionalYes ? parseFloat(p.poolConditionalYes.currentPrice).toFixed(4) : 'N/A'}</p>
+                </div>
+            `).join('');
+            document.getElementById('content').innerHTML = html;
+        }
+
+        async function loadDetail(id) {
+            document.getElementById('nav-path').innerText = `Proposal ${id}`;
+            const data = await gql(`
+                { 
+                    unifiedOneStopShop(id: "${id}") { 
+                        title, description, marketName, displayNameEvent, displayNameQuestion,
+                        companyToken { symbol decimals }
+                        currencyToken { symbol decimals }
+                        poolConditionalYes { id currentPrice volume24h }
+                        poolConditionalNo { id currentPrice volume24h }
+                        poolPredictionYes { id currentPrice volume24h }
+                    } 
+                }
+            `);
+            const p = data.unifiedOneStopShop;
+            const html = `
+                <div style="grid-column: 1 / -1; background:#1e293b; padding:20px; border-radius:8px;">
+                    <h2>${p.displayNameQuestion}</h2>
+                    <h3 style="color:#a78bfa">${p.displayNameEvent}</h3>
+                    <p>${p.description}</p>
+                    
+                    <div style="margin-top:20px;">
+                        <h4>Pools Overview</h4>
+                        ${renderPoolRow("Conditional YES", p.poolConditionalYes)}
+                        ${renderPoolRow("Conditional NO", p.poolConditionalNo)}
+                        ${renderPoolRow("Prediction YES", p.poolPredictionYes)}
+                    </div>
+                </div>
+            `;
+            document.getElementById('content').innerHTML = html;
+        }
+
+        function renderPoolRow(name, pool) {
+            if (!pool) return `<div class="pool-row"><span>${name}</span> <span style="color:red">Not Found</span></div>`;
+            return `
+                <div class="pool-row">
+                    <span>${name}</span> 
+                    <span>Price: <b class="active">$${parseFloat(pool.currentPrice).toFixed(4)}</b></span>
+                    <span>Vol: ${parseFloat(pool.volume24h).toFixed(2)}</span>
+                </div>`;
+        }
+
+        // Start
+        loadAggregators();
+
+    </script>
+</body>
+
+</html>

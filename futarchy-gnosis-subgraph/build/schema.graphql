@@ -7,8 +7,8 @@ type Proposal @entity {
   createdAtBlock: BigInt!
 
   # Tokens
-  collateralToken1: Bytes! # Company Token
-  collateralToken2: Bytes! # Currency Token
+  companyToken: Bytes! # Company Token
+  currencyToken: Bytes! # Currency Token
   
   # Wrapped Outcomes
   outcomeYesCompany: Bytes!  # 0

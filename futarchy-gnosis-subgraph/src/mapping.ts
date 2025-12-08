@@ -26,8 +26,8 @@ export function handleNewProposal(event: NewProposal): void {
     let companyToken = !col1Call.reverted ? col1Call.value : ZERO_ADDRESS
     let currencyToken = !col2Call.reverted ? col2Call.value : ZERO_ADDRESS
 
-    entity.collateralToken1 = companyToken
-    entity.collateralToken2 = currencyToken
+    entity.companyToken = companyToken
+    entity.currencyToken = currencyToken
 
     // Fetch Wrapped Outcomes (0,1,2,3)
     let w0 = getWrapped(contract, 0) // YES_COMPANY
@@ -104,7 +104,7 @@ function linkPoolToProposal(proposalId: Bytes, role: string, otherToken: Address
     let p = Proposal.load(proposalId)
     if (p == null) return
 
-    let currency = Address.fromBytes(p.collateralToken2)
+    let currency = Address.fromBytes(p.currencyToken)
     let yesComp = Address.fromBytes(p.outcomeYesCompany)
     let noComp = Address.fromBytes(p.outcomeNoCompany)
     let yesCurr = Address.fromBytes(p.outcomeYesCurrency)

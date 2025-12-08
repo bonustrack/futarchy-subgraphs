@@ -1,0 +1,25 @@
+🔍 Starting Comparison: Chain vs Subgraph... 
+
+🔗 [CHAIN] Fetching Aggregator: 0xdc5825b60462F38C41E0d3e7F7e3052148A610EE 
+   Found 2 Organizations on-chain. 
+
+🌐 [SUBGRAPH] Querying Subgraph... 
+
+--------------------------------------------------- 
+🏢 Organization: 0xe204584Feb4564d3891739E395F6d6198F218247 
+   [CHAIN] Name: "GNOSIS DAO" | Proposal Count: 2 
+   [CHAIN] Metadata Addresses: ["0xA62c418D49dd955df13C92F6939E1ebc09227077","0x55717324B91d57a11fCC93fB5E6141575892bde1"]
+   [SUBGRAPH] Name: "GNOSIS DAO" | Proposal Count: 1 
+   [SUBGRAPH] Trading Addresses: ["0x9590daf4d5cd4009c3f9767c5e7668175cfd37cf"]
+      - Metadata: 0xA62c418D49dd955df13C92F6939E1ebc09227077 -> Trading: 0x7e9Fc0C3d6C1619d4914556ad2dEe6051Ce68418 [❌ MISSING IN SUBGRAPH] 
+        💀  Does NOT exist in Subgraph at all. 
+      - Metadata: 0x55717324B91d57a11fCC93fB5E6141575892bde1 -> Trading: 0x9590dAF4d5cd4009c3F9767C5E7668175cFd37CF [✅ OK] 
+
+--------------------------------------------------- 
+🏢 Organization: 0x74bf4a8596A3e271720F8154eAaC6017f9eF39eE 
+   [CHAIN] Name: "Kleros DAO" | Proposal Count: 1 
+   [CHAIN] Metadata Addresses: ["0xe1DA434751bcAb7181CC432Bf3c2Faf43Ee1DA2d"]
+   [SUBGRAPH] Name: "Kleros DAO" | Proposal Count: 0 
+   [SUBGRAPH] Trading Addresses: []
+      - Metadata: 0xe1DA434751bcAb7181CC432Bf3c2Faf43Ee1DA2d -> Trading: 0x2C1e08674f3F78f8a1426a41C41B8BF546fA481a [❌ MISSING IN SUBGRAPH] 
+        ⚠️  Exist in Subgraph but UNLINKED? Org: NULL 

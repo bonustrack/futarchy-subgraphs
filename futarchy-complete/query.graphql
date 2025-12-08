@@ -1,0 +1,67 @@
+# The "Magic" Query for Frontend
+# This fetches EVERYTHING needed to render the market page in one go.
+
+query GetMarketPageData($proposalId: ID!) {
+  unifiedOneStopShop(id: $proposalId) {
+    # 1. Header Information
+    # 1. Header Information
+    title
+    description
+    marketName
+    displayNameEvent
+    displayNameQuestion
+    resolutionDate
+    
+    # 2. Token Details (for UI formatting)
+    companyToken { symbol decimals }
+    currencyToken { symbol decimals }
+    
+    # 3. The Pools (Example: Just showing two, but you'd fetch all 6)
+    
+    # --- 1. CONDITIONAL POOLS (Company Token vs Currency Token) ---
+    
+    # YES: Price of YES_COMPANY in terms of YES_CURRENCY
+    poolConditionalYes { ...PoolDetails }
+    
+    # NO: Price of NO_COMPANY in terms of NO_CURRENCY
+    poolConditionalNo { ...PoolDetails }
+
+    # --- 2. EXPECTED VALUE POOLS (Outcome Company vs Real Currency) ---
+    
+    # YES: Price of YES_COMPANY in terms of USDC
+    poolExpectedYes { ...PoolDetails }
+    
+    # NO: Price of NO_COMPANY in terms of USDC
+    poolExpectedNo { ...PoolDetails }
+    
+    # --- 3. PREDICTION POOLS (Outcome Currency vs Real Currency) ---
+    
+    # YES: Price of YES_CURRENCY in terms of USDC (Probability of Pass)
+    poolPredictionYes { ...PoolDetails }
+    
+    # NO: Price of NO_CURRENCY in terms of USDC (Probability of Fail)
+    poolPredictionNo { ...PoolDetails }
+  }
+}
+
+fragment PoolDetails on NormalizedPool {
+  id
+  currentPrice
+  volume24h
+  candles(interval: "15m") {
+    time
+    open
+    high
+    low
+    close
+    volume
+  }
+  trades(first: 20, orderBy: timestamp, orderDirection: desc) {
+    timestamp
+    type
+    price
+    amountBase
+    amountQuote
+    maker
+  }
+}

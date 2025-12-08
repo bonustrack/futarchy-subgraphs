@@ -117,8 +117,8 @@ export class Proposal extends Entity {
     this.set("createdAtBlock", Value.fromBigInt(value));
   }
 
-  get collateralToken1(): Bytes {
-    let value = this.get("collateralToken1");
+  get companyToken(): Bytes {
+    let value = this.get("companyToken");
     if (!value || value.kind == ValueKind.NULL) {
       throw new Error("Cannot return null for a required field.");
     } else {
@@ -126,12 +126,12 @@ export class Proposal extends Entity {
     }
   }
 
-  set collateralToken1(value: Bytes) {
-    this.set("collateralToken1", Value.fromBytes(value));
+  set companyToken(value: Bytes) {
+    this.set("companyToken", Value.fromBytes(value));
   }
 
-  get collateralToken2(): Bytes {
-    let value = this.get("collateralToken2");
+  get currencyToken(): Bytes {
+    let value = this.get("currencyToken");
     if (!value || value.kind == ValueKind.NULL) {
       throw new Error("Cannot return null for a required field.");
     } else {
@@ -139,8 +139,8 @@ export class Proposal extends Entity {
     }
   }
 
-  set collateralToken2(value: Bytes) {
-    this.set("collateralToken2", Value.fromBytes(value));
+  set currencyToken(value: Bytes) {
+    this.set("currencyToken", Value.fromBytes(value));
   }
 
   get outcomeYesCompany(): Bytes {
