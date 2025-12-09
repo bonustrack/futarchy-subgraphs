@@ -38,7 +38,13 @@ type UnifiedOneStopShop @entity {
   # The Tokens
   companyToken: TokenInfo!
   currencyToken: TokenInfo!
-  
+
+  # Wrapped Outcomes (For debugging and linking)
+  outcomeYesCompany: String
+  outcomeNoCompany: String
+  outcomeYesCurrency: String
+  outcomeNoCurrency: String
+
   # The 6 Pools
   poolConditionalYes: NormalizedPool
   poolConditionalNo: NormalizedPool

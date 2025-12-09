@@ -420,6 +420,74 @@ export class UnifiedOneStopShop extends Entity {
     this.set("currencyToken", Value.fromString(value));
   }
 
+  get outcomeYesCompany(): string | null {
+    let value = this.get("outcomeYesCompany");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toString();
+    }
+  }
+
+  set outcomeYesCompany(value: string | null) {
+    if (!value) {
+      this.unset("outcomeYesCompany");
+    } else {
+      this.set("outcomeYesCompany", Value.fromString(<string>value));
+    }
+  }
+
+  get outcomeNoCompany(): string | null {
+    let value = this.get("outcomeNoCompany");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toString();
+    }
+  }
+
+  set outcomeNoCompany(value: string | null) {
+    if (!value) {
+      this.unset("outcomeNoCompany");
+    } else {
+      this.set("outcomeNoCompany", Value.fromString(<string>value));
+    }
+  }
+
+  get outcomeYesCurrency(): string | null {
+    let value = this.get("outcomeYesCurrency");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toString();
+    }
+  }
+
+  set outcomeYesCurrency(value: string | null) {
+    if (!value) {
+      this.unset("outcomeYesCurrency");
+    } else {
+      this.set("outcomeYesCurrency", Value.fromString(<string>value));
+    }
+  }
+
+  get outcomeNoCurrency(): string | null {
+    let value = this.get("outcomeNoCurrency");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toString();
+    }
+  }
+
+  set outcomeNoCurrency(value: string | null) {
+    if (!value) {
+      this.unset("outcomeNoCurrency");
+    } else {
+      this.set("outcomeNoCurrency", Value.fromString(<string>value));
+    }
+  }
+
   get poolConditionalYes(): string | null {
     let value = this.get("poolConditionalYes");
     if (!value || value.kind == ValueKind.NULL) {
