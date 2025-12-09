@@ -1,0 +1,18 @@
+type Account @entity {
+  id: Bytes! # User Address
+  balances: [Balance!]! @derivedFrom(field: "account")
+}
+
+type Token @entity {
+  id: Bytes! # Token Address
+  proposal: Bytes! # Proposal Address
+  role: String! # e.g. "YES_COMPANY"
+  balances: [Balance!]! @derivedFrom(field: "token")
+}
+
+type Balance @entity {
+  id: Bytes! # Set to `account.concat(token)`
+  account: Account!
+  token: Token!
+  amount: BigInt!
+}
