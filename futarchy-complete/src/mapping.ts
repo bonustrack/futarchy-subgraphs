@@ -37,12 +37,16 @@ const Q96 = BigDecimal.fromString("79228162514264337593543950336")
 // ============================================
 // 1. FUTARCHY PROPOSAL CREATION (Trading Core)
 // ============================================
+// ============================================
+// 1. FUTARCHY PROPOSAL CREATION (Trading Core)
+// ============================================
 export function handleNewProposal(event: NewProposal): void {
     let proposalId = event.params.proposal
     let entity = getOrCreateUnifiedEntity(proposalId)
 
     // Trading data is now available
     entity.marketName = event.params.marketName
+    entity.title = event.params.marketName // FIX: Set title immediately
     entity.createdAtTimestamp = event.block.timestamp
 
     // Fetch Tokens
@@ -78,6 +82,10 @@ export function handleNewProposal(event: NewProposal): void {
 // 2. METADATA & HIERARCHY
 // ============================================
 
+// ============================================
+// 2. METADATA & HIERARCHY
+// ============================================
+
 export function handleAggregatorCreated(event: AggregatorMetadataCreated): void {
     AggregatorTemplate.create(event.params.metadata)
 
@@ -97,7 +105,8 @@ export function handleAggregatorCreated(event: AggregatorMetadataCreated): void 
 export function handleOrganizationAdded(event: OrganizationAdded): void {
     OrganizationTemplate.create(event.params.organizationMetadata)
 
-    let entity = new Organization(event.params.organizationMetadata.toHexString())
+    let orgId = event.params.organizationMetadata.toHexString()
+    let entity = new Organization(orgId)
     entity.aggregator = event.address.toHexString()
     entity.createdAt = event.block.timestamp
 
@@ -112,45 +121,24 @@ export function handleOrganizationAdded(event: OrganizationAdded): void {
     entity.owner = !oCall.reverted ? oCall.value : event.transaction.from
 
     entity.save()
+
+    // BACKFILL: Fetch existing proposals from Organization state (for "Time Travel" / Old Proposals)
+    let countCall = contract.try_getProposalsCount()
+    if (!countCall.reverted && countCall.value.gt(BigInt.zero())) {
+        let count = countCall.value
+        // We use offset 0, limit = count. Be careful with size, but for now safe.
+        let propsCall = contract.try_getProposals(BigInt.zero(), count)
+        if (!propsCall.reverted) {
+            let proposals = propsCall.value
+            for (let i = 0; i < proposals.length; i++) {
+                linkProposalToOrganization(proposals[i], orgId)
+            }
+        }
+    }
 }
 
 export function handleProposalAdded(event: ProposalAdded): void {
-    // 1. Create Template to listen for updates
-    ProposalTemplate.create(event.params.proposalMetadata)
-
-    let metaId = event.params.proposalMetadata.toHexString()
-    let orgId = event.address.toHexString()
-
-    // 2. Bind to Metadata Contract to get the Trading Proposal Address
-    let contract = MetadataContract.bind(event.params.proposalMetadata)
-    let addrCall = contract.try_proposalAddress()
-
-    if (addrCall.reverted) {
-        log.warning("ProposalAdded: Could not fetch proposalAddress from {}", [metaId])
-        return
-    }
-
-    let tradingProposalId = addrCall.value
-
-    // 3. Create/Update the Unified Entity (Shell or Existing)
-    let entity = getOrCreateUnifiedEntity(tradingProposalId)
-    entity.organization = orgId
-    entity.metadataContract = event.params.proposalMetadata
-
-    // 4. Fill Metadata
-    let qCall = contract.try_displayNameQuestion()
-    entity.displayNameQuestion = !qCall.reverted ? qCall.value : "Loading..."
-    if (!qCall.reverted) entity.title = qCall.value // Use question as title default? Or Event?
-
-    let eCall = contract.try_displayNameEvent()
-    entity.displayNameEvent = !eCall.reverted ? eCall.value : "Loading..."
-    // Override title with Event name if available, usually better
-    if (!eCall.reverted && eCall.value.length > 0) entity.title = eCall.value
-
-    let dCall = contract.try_description()
-    entity.description = !dCall.reverted ? dCall.value : "Loading..."
-
-    entity.save()
+    linkProposalToOrganization(event.params.proposalMetadata, event.address.toHexString())
 }
 
 export function handleProposalMetadataUpdated(event: MetadataUpdated): void {
@@ -175,206 +163,198 @@ export function handleProposalMetadataUpdated(event: MetadataUpdated): void {
     entity.save()
 }
 
-
 // ============================================
-// 3. POOL & TRADING LOGIC
+// 3. REUSABLE LINKING LOGIC (For Event & Historical Backfill)
 // ============================================
-export function handlePoolCreated(event: PoolEvent): void {
-    let poolId = event.params.pool.toHexString()
-    AlgebraPool.create(event.params.pool)
-    let pool = new NormalizedPool(poolId)
-    pool.baseToken = createTokenInfo(event.params.token0)
-    pool.quoteToken = createTokenInfo(event.params.token1)
-    pool.isBaseToken0 = true
-    pool.currentPrice = BigDecimal.zero()
-    pool.volume24h = BigDecimal.zero()
-    pool.save()
-}
 
-export function handleSwap(event: Swap): void {
-    let poolId = event.address.toHexString()
-    let pool = NormalizedPool.load(poolId)
-    if (!pool) return
+function linkProposalToOrganization(metadataAddr: Address, orgId: string): void {
+    // 1. Create Template to listen for updates
+    ProposalTemplate.create(metadataAddr)
 
-    let token0Params = TokenInfo.load(pool.baseToken)
-    let token1Params = TokenInfo.load(pool.quoteToken)
-    let d0 = token0Params ? BigInt.fromString(token0Params.decimals.toString()) : BigInt.fromI32(18)
-    let d1 = token1Params ? BigInt.fromString(token1Params.decimals.toString()) : BigInt.fromI32(18)
+    let metaId = metadataAddr.toHexString()
 
-    let rawPrice = getPrice(event.params.price, d0, d1)
-    let normalizedPrice = pool.isBaseToken0 ? rawPrice : invert(rawPrice)
+    // 2. Bind to Metadata Contract to get the Trading Proposal Address
+    let contract = MetadataContract.bind(metadataAddr)
+    let addrCall = contract.try_proposalAddress()
 
-    pool.currentPrice = normalizedPrice
-    pool.save()
-
-    updateCandle(pool, event.block.timestamp, normalizedPrice, event.params.amount0, event.params.amount1)
-
-    let tradeId = event.transaction.hash.concatI32(event.logIndex.toI32()).toHexString()
-    let trade = new UnifiedTrade(tradeId)
-    trade.pool = poolId
-    trade.timestamp = event.block.timestamp
-    trade.txHash = event.transaction.hash
-    trade.price = normalizedPrice
-
-    let isBuy = false
-    if (pool.isBaseToken0) {
-        isBuy = event.params.amount0.lt(BigInt.zero())
-        trade.amountBase = event.params.amount0.abs().toBigDecimal()
-        trade.amountQuote = event.params.amount1.abs().toBigDecimal()
-    } else {
-        isBuy = event.params.amount1.lt(BigInt.zero())
-        trade.amountBase = event.params.amount1.abs().toBigDecimal()
-        trade.amountQuote = event.params.amount0.abs().toBigDecimal()
+    if (addrCall.reverted) {
+        log.warning("LinkProposal: Could not fetch proposalAddress from {}", [metaId])
+        return
     }
-    trade.type = isBuy ? "BUY" : "SELL"
-    trade.maker = event.params.sender
-    trade.save()
-}
 
+    let tradingProposalId = addrCall.value
 
-// ============================================
-// HELPERS
-// ============================================
+    // 3. Create/Update the Unified Entity (Shell or Existing)
+    let entity = getOrCreateUnifiedEntity(tradingProposalId)
+    entity.organization = orgId
+    entity.metadataContract = metadataAddr
 
-function getOrCreateUnifiedEntity(proposalId: Bytes): UnifiedOneStopShop {
-    let id = proposalId.toHexString()
-    let entity = UnifiedOneStopShop.load(id)
-    if (entity == null) {
-        entity = new UnifiedOneStopShop(id)
-        // Default values to avoid null errors
-        entity.title = "Loading..."
-        entity.description = "Loading..."
-        entity.marketName = "Initializing..."
-        entity.displayNameEvent = "Loading..."
-        entity.displayNameQuestion = "Loading..."
-        entity.resolutionDate = BigInt.fromI32(0)
-        entity.createdAtTimestamp = BigInt.fromI32(0)
-
-        // Placeholders for tokens (will be filled by NewProposal)
-        entity.companyToken = "UNKNOWN"
-        entity.currencyToken = "UNKNOWN"
-
-        // Ensure dummy known tokens exist to satisfy non-nullable schema? 
-        // Schema says TokenInfo! so we need valid IDs.
-        // We use a predefined "UNKNOWN" ID.
-        let unknown = createTokenInfo(ZERO_ADDRESS)
-        entity.companyToken = unknown
-        entity.currencyToken = unknown
-
-        entity.save()
+    // 4. Fill Metadata
+    // ============================================
+    export function handlePoolCreated(event: PoolEvent): void {
+        let poolId = event.params.pool.toHexString()
+        AlgebraPool.create(event.params.pool)
+        let pool = new NormalizedPool(poolId)
+        pool.baseToken = createTokenInfo(event.params.token0)
+        pool.quoteToken = createTokenInfo(event.params.token1)
+        pool.isBaseToken0 = true
+        pool.currentPrice = BigDecimal.zero()
+        pool.volume24h = BigDecimal.zero()
+        pool.save()
     }
-    return entity
-}
 
-function findAndLinkPool(factory: AlgebraFactory, tA: Address, tB: Address, baseIsA: boolean, proposalId: Bytes): string | null {
-    if (tA == ZERO_ADDRESS || tB == ZERO_ADDRESS) return null
-    let call = factory.try_poolByPair(tA, tB)
-    if (!call.reverted && call.value != ZERO_ADDRESS) {
-        let poolId = call.value.toHexString()
+    export function handleSwap(event: Swap): void {
+        let poolId = event.address.toHexString()
         let pool = NormalizedPool.load(poolId)
-        if (pool) {
-            let addrA = tA.toHexString()
-            let addrB = tB.toHexString()
+        if (!pool) return
 
-            if (addrA < addrB) {
-                pool.isBaseToken0 = true
-            } else {
-                pool.isBaseToken0 = false
-            }
-            pool.save()
-            return poolId
+        let token0Params = TokenInfo.load(pool.baseToken)
+        let token1Params = TokenInfo.load(pool.quoteToken)
+        let d0 = token0Params ? BigInt.fromString(token0Params.decimals.toString()) : BigInt.fromI32(18)
+        let d1 = token1Params ? BigInt.fromString(token1Params.decimals.toString()) : BigInt.fromI32(18)
+
+        let rawPrice = getPrice(event.params.price, d0, d1)
+        let normalizedPrice = pool.isBaseToken0 ? rawPrice : invert(rawPrice)
+
+        pool.currentPrice = normalizedPrice
+        pool.save()
+
+        updateCandle(pool, event.block.timestamp, normalizedPrice, event.params.amount0, event.params.amount1)
+
+        let tradeId = event.transaction.hash.concatI32(event.logIndex.toI32()).toHexString()
+        let trade = new UnifiedTrade(tradeId)
+        trade.pool = poolId
+        trade.timestamp = event.block.timestamp
+        trade.txHash = event.transaction.hash
+        trade.price = normalizedPrice
+
+        let isBuy = false
+        if (pool.isBaseToken0) {
+            isBuy = event.params.amount0.lt(BigInt.zero())
+            trade.amountBase = event.params.amount0.abs().toBigDecimal()
+            trade.amountQuote = event.params.amount1.abs().toBigDecimal()
+        } else {
+            isBuy = event.params.amount1.lt(BigInt.zero())
+            trade.amountBase = event.params.amount1.abs().toBigDecimal()
+            trade.amountQuote = event.params.amount0.abs().toBigDecimal()
         }
-        return poolId
+        trade.type = isBuy ? "BUY" : "SELL"
+        trade.maker = event.params.sender
+        trade.save()
     }
-    return null
-}
 
-function createTokenInfo(addr: Address): string {
-    let id = addr.toHexString()
-    let token = TokenInfo.load(id)
-    if (!token) {
-        token = new TokenInfo(id)
 
-        // Default / Fallback
-        token.name = "Unknown Token"
-        token.symbol = "UNK"
-        token.decimals = BigInt.fromI32(18)
+    // ============================================
+    // HELPERS
+    // ============================================
 
-        if (addr != ZERO_ADDRESS) {
-            let erc20 = ERC20.bind(addr)
+    function getOrCreateUnifiedEntity(proposalId: Bytes): UnifiedOneStopShop {
+        let id = proposalId.toHexString()
+        let entity = UnifiedOneStopShop.load(id)
+        if (entity == null) {
+            entity = new UnifiedOneStopShop(id)
+            // Default values to avoid null errors
+            entity.title = "Loading..."
+            entity.description = "Loading..."
+            entity.marketName = "Initializing..."
+            entity.displayNameEvent = "Loading..."
+            entity.displayNameQuestion = "Loading..."
+            entity.resolutionDate = BigInt.fromI32(0)
+            entity.createdAtTimestamp = BigInt.fromI32(0)
 
-            // Name
-            let callName = erc20.try_name()
-            if (!callName.reverted) {
-                token.name = callName.value
+            // Placeholders for tokens (will be filled by NewProposal)
+            entity.companyToken = "UNKNOWN"
+            entity.currencyToken = "UNKNOWN"
+
+            // Ensure dummy known tokens exist to satisfy non-nullable schema? 
+            // Schema says TokenInfo! so we need valid IDs.
+            // We use a predefined "UNKNOWN" ID.
+            let unknown = createTokenInfo(ZERO_ADDRESS)
+            entity.companyToken = unknown
+            entity.currencyToken = unknown
+
+            entity.save()
+
+            // Default / Fallback
+            token.name = "Unknown Token"
+            token.symbol = "UNK"
+            token.decimals = BigInt.fromI32(18)
+
+            if (addr != ZERO_ADDRESS) {
+                let erc20 = ERC20.bind(addr)
+
+                // Name
+                let callName = erc20.try_name()
+                if (!callName.reverted) {
+                    token.name = callName.value
+                }
+
+                // Symbol: Try string then bytes32
+                let callSymbol = erc20.try_symbol()
+                if (!callSymbol.reverted) {
+                    token.symbol = callSymbol.value
+                } else {
+                    // Try bytes32
+                    // We don't have a helper for this in standard generated code unless we update ABI
+                    // But usually standard ERC20 abi only has string symbol()
+                    // If it fails, we keep UNK. 
+                    // Wait, user hates "TNK". We used "UNK".
+                    // Maybe we can try to use the address subset?
+                    token.symbol = "UNK-" + id.slice(2, 6)
+                }
+
+                // Decimals
+                let callDecimals = erc20.try_decimals()
+                if (!callDecimals.reverted) {
+                    token.decimals = BigInt.fromI32(callDecimals.value)
+                }
             }
 
-            // Symbol: Try string then bytes32
-            let callSymbol = erc20.try_symbol()
-            if (!callSymbol.reverted) {
-                token.symbol = callSymbol.value
-            } else {
-                // Try bytes32
-                // We don't have a helper for this in standard generated code unless we update ABI
-                // But usually standard ERC20 abi only has string symbol()
-                // If it fails, we keep UNK. 
-                // Wait, user hates "TNK". We used "UNK".
-                // Maybe we can try to use the address subset?
-                token.symbol = "UNK-" + id.slice(2, 6)
-            }
-
-            // Decimals
-            let callDecimals = erc20.try_decimals()
-            if (!callDecimals.reverted) {
-                token.decimals = BigInt.fromI32(callDecimals.value)
-            }
+            token.save()
         }
-
-        token.save()
+        return id
     }
-    return id
-}
 
-function getWrapped(contract: FutarchyProposal, index: i32): Address {
-    let call = contract.try_wrappedOutcome(BigInt.fromI32(index))
-    return !call.reverted ? call.value.getWrapped1155() : ZERO_ADDRESS
-}
-
-function getPrice(priceQ96: BigInt, decimal0: BigInt, decimal1: BigInt): BigDecimal {
-    let value = priceQ96.toBigDecimal()
-    let priceRaw = value.div(Q96).times(value.div(Q96))
-    let scaler0 = BigInt.fromI32(10).pow(u8(decimal0.toI32())).toBigDecimal()
-    let scaler1 = BigInt.fromI32(10).pow(u8(decimal1.toI32())).toBigDecimal()
-    return priceRaw.times(scaler0).div(scaler1)
-}
-
-function invert(price: BigDecimal): BigDecimal {
-    if (price.equals(BigDecimal.zero())) return BigDecimal.zero()
-    return BigDecimal.fromString("1").div(price)
-}
-
-function updateCandle(pool: NormalizedPool, timestamp: BigInt, price: BigDecimal, amount0: BigInt, amount1: BigInt): void {
-    let ts = timestamp.toI32()
-    let period = 3600
-    let periodStart = (ts / period) * period
-    let id = pool.id + "-" + periodStart.toString()
-
-    let candle = UnifiedCandle.load(id)
-    if (!candle) {
-        candle = new UnifiedCandle(id)
-        candle.pool = pool.id
-        candle.time = BigInt.fromI32(periodStart)
-        candle.period = period
-        candle.open = price
-        candle.high = price
-        candle.low = price
-        candle.close = price
-        candle.volume = BigDecimal.zero()
-        candle.save()
-    } else {
-        if (price.gt(candle.high)) candle.high = price
-        if (price.lt(candle.low)) candle.low = price
-        candle.close = price
-        candle.save()
+    function getWrapped(contract: FutarchyProposal, index: i32): Address {
+        let call = contract.try_wrappedOutcome(BigInt.fromI32(index))
+        return !call.reverted ? call.value.getWrapped1155() : ZERO_ADDRESS
     }
-}
+
+    function getPrice(priceQ96: BigInt, decimal0: BigInt, decimal1: BigInt): BigDecimal {
+        let value = priceQ96.toBigDecimal()
+        let priceRaw = value.div(Q96).times(value.div(Q96))
+        let scaler0 = BigInt.fromI32(10).pow(u8(decimal0.toI32())).toBigDecimal()
+        let scaler1 = BigInt.fromI32(10).pow(u8(decimal1.toI32())).toBigDecimal()
+        return priceRaw.times(scaler0).div(scaler1)
+    }
+
+    function invert(price: BigDecimal): BigDecimal {
+        if (price.equals(BigDecimal.zero())) return BigDecimal.zero()
+        return BigDecimal.fromString("1").div(price)
+    }
+
+    function updateCandle(pool: NormalizedPool, timestamp: BigInt, price: BigDecimal, amount0: BigInt, amount1: BigInt): void {
+        let ts = timestamp.toI32()
+        let period = 3600
+        let periodStart = (ts / period) * period
+        let id = pool.id + "-" + periodStart.toString()
+
+        let candle = UnifiedCandle.load(id)
+        if (!candle) {
+            candle = new UnifiedCandle(id)
+            candle.pool = pool.id
+            candle.time = BigInt.fromI32(periodStart)
+            candle.period = period
+            candle.open = price
+            candle.high = price
+            candle.low = price
+            candle.close = price
+            candle.volume = BigDecimal.zero()
+            candle.save()
+        } else {
+            if (price.gt(candle.high)) candle.high = price
+            if (price.lt(candle.low)) candle.low = price
+            candle.close = price
+            candle.save()
+        }
+    }

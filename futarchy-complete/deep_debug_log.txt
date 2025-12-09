@@ -1,0 +1,33 @@
+🔬 STARTING DEEP CHAIN INVESTIGATION 🔬
+
+--- 1. Checking Organization 0xe204584Feb4564d3891739E395F6d6198F218247 ---
+[CHAIN] Proposal Count: 2
+[CHAIN] Metadata Address 0xA62c418D49dd955df13C92F6939E1ebc09227077 in list? YES
+
+--- 2. Checking Metadata 0xA62c418D49dd955df13C92F6939E1ebc09227077 ---
+[CHAIN] Trading Address: 0x7e9Fc0C3d6C1619d4914556ad2dEe6051Ce68418
+[CHAIN] Meta Question: "What will be the price of GNO"
+[CHAIN] Meta Event: "if its price is >= 130 sDAI?"
+
+--- 3. Checking Trading Contract 0x7e9Fc0C3d6C1619d4914556ad2dEe6051Ce68418 ---
+[CHAIN] Market Name: "Will GNO price be at or above 130 sDAI (Savings xDAI) at December 28, 2025 11:59 PM?"
+[CHAIN] Col1: 0x9C58BAcC331c9aa871AFD802DB6379a98e80CEdb
+[CHAIN] Col2: 0xaf204776c7245bF4147c2612BF6e5972Ee483701
+[CHAIN] Token Symbols: GNO / sDAI
+
+--- 4. Checking Pools (Algebra Logic) ---
+[CHAIN] Wrapped Outcomes: [0x2aFd4Fc8B3cc8505BCD1cC9B9E39A3e28877463F, 0x209b48cb8D47B446fa83d0Cda8b2730dB6F84236, 0xDB19aA09CEC2Fd0115bfE0403331CFe8dB556e2E, 0x103c32929f1C3245f54DfEc43F29f90B8027c093]
+   [ConditionalYes] Pair 0x2aFd/0xDB19 -> Pool: 0xd8c19654Bd52CbaC4FE60D2C4477987894F14e1c
+   [ConditionalNo] Pair 0x209b/0x103c -> Pool: 0xb77B45639D6b73A615A267C995C6a9d7114f8Fdf
+   [ExpectedYes] Pair 0x2aFd/0xaf20 -> Pool: 0xA2D8857Df4abe616443649d67b65dE94BE209f48
+   [ExpectedNo] Pair 0x209b/0xaf20 -> Pool: 0xAeb6f41fB5438C396D17868a813e900ABF9430E6
+   [PredictionYes] Pair 0xDB19/0xaf20 -> Pool: 0xbE61AB2B8AAEbE24D79DB9F8f1dD664312F0A336
+   [PredictionNo] Pair 0x103c/0xaf20 -> Pool: 0xbb292Ca362dab64aC508059b8d0B465fd7A5F8Aa
+
+--- 5. Subgraph Comparison ---
+✅ SUBGRAPH: Found Entity!
+   - Title: "Loading..."
+   - MarketName: "Will GNO price be at or above 130 sDAI (Savings xDAI) at December 28, 2025 11:59 PM?"
+   - Tokens: GNO/sDAI
+   - Org: NULL
+   - All Pools Linked? false

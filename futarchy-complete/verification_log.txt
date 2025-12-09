@@ -1,0 +1,24 @@
+﻿­ƒöì Starting Deep Verification for 'FutarchyFi'...
+
+Ô£à Found Aggregator: FutarchyFi (0xdc5825b60462f38c41e0d3e7f7e3052148a610ee)
+   Description: The premier aggregation layer for Futarchy markets.
+   Organizations: 2
+
+---------------------------------------------------
+­ƒÅó Organization: Kleros DAO (0x74bf4a8596a3e271720f8154eaac6017f9ef39ee)
+   Proposals Count: 0
+   ÔÜá´©Å  No proposals to verify.
+
+---------------------------------------------------
+­ƒÅó Organization: GNOSIS DAO (0xe204584feb4564d3891739e395f6d6198f218247)
+   Proposals Count: 1
+   
+   ­ƒôä Proposal: if Circle deploy native USDC on Gnosis Chain?
+      ID: 0x9590daf4d5cd4009c3f9767c5e7668175cfd37cf
+      MarketName: Initializing...
+      Metadata Status: Ô£à OK
+      Tokens: GNO / sDAI [Ô£à]
+      Pools: 0/6 Linked.
+      ÔØî MISSING POOLS!
+         - Missing ConditionalYes
+         - Missing ConditionalNo
