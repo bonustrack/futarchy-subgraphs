@@ -67,7 +67,7 @@
     <div id="content" class="grid"></div>
 
     <script>
-        const API_URL = "https://api.studio.thegraph.com/query/1718249/futarchy-complete/0.0.6";
+        const API_URL = "https://api.studio.thegraph.com/query/1718249/futarchy-complete/v0.0.15";
 
         async function gql(query) {
             const res = await fetch(API_URL, {
@@ -136,7 +136,14 @@
                         title, description, marketName, displayNameEvent, displayNameQuestion,
                         companyToken { symbol decimals }
                         currencyToken { symbol decimals }
-                        poolConditionalYes { id currentPrice volume24h }
+                        
+                        outcomeYesCompany outcomeNoCompany outcomeYesCurrency outcomeNoCurrency
+
+                        poolConditionalYes { 
+                            id currentPrice volume24h 
+                            trades(orderBy: timestamp, orderDirection: desc, first: 10) { id type price amountBase amountQuote timestamp }
+                            candles(orderBy: time, orderDirection: asc, first: 1000) { time open high low close volume }
+                        }
                         poolConditionalNo { id currentPrice volume24h }
                         poolPredictionYes { id currentPrice volume24h }
                     } 
@@ -148,6 +155,12 @@
                     <h2>${p.displayNameQuestion}</h2>
                     <h3 style="color:#a78bfa">${p.displayNameEvent}</h3>
                     <p>${p.description}</p>
+
+                    <div style="background:#0f172a; padding:10px; margin-top:10px; border-radius:4px; font-family:monospace; font-size:0.8em;">
+                        <strong>Outcomes:</strong><br>
+                        YES: ${p.outcomeYesCompany ? p.outcomeYesCompany.slice(0, 10) + '...' : 'N/A'}<br>
+                        NO: ${p.outcomeNoCompany ? p.outcomeNoCompany.slice(0, 10) + '...' : 'N/A'}
+                    </div>
                     
                     <div style="margin-top:20px;">
                         <h4>Pools Overview</h4>
@@ -155,9 +168,15 @@
                         ${renderPoolRow("Conditional NO", p.poolConditionalNo)}
                         ${renderPoolRow("Prediction YES", p.poolPredictionYes)}
                     </div>
+
+                    ${p.poolConditionalYes ? renderDeepDive("Conditional YES", p.poolConditionalYes) : ''}
                 </div>
             `;
             document.getElementById('content').innerHTML = html;
+
+            if (p.poolConditionalYes) {
+                renderChart(`chart-${p.poolConditionalYes.id}`, p.poolConditionalYes.candles);
+            }
         }
 
         function renderPoolRow(name, pool) {
@@ -168,6 +187,88 @@
                     <span>Price: <b class="active">$${parseFloat(pool.currentPrice).toFixed(4)}</b></span>
                     <span>Vol: ${parseFloat(pool.volume24h).toFixed(2)}</span>
                 </div>`;
+        }
+
+        function renderDeepDive(name, pool) {
+            return `
+                <div style="margin-top:30px; border-top:1px solid #333; padding-top:20px;">
+                    <h3>${name} Deep Dive</h3>
+                    
+                    <!-- CHART -->
+                    <div id="chart-${pool.id}" style="height: 300px; width:100%; margin-bottom:20px;"></div>
+
+                    <!-- TRADES -->
+                    <h4>Recent Trades</h4>
+                    <table style="width:100%; text-align:left; border-collapse:collapse; font-size:0.9em;">
+                        <thead>
+                            <tr style="border-bottom:1px solid #555;">
+                                <th>Ver</th>
+                                <th>Price</th>
+                                <th>Base</th>
+                                <th>Quote</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${pool.trades.map(t => {
+                const date = new Date(parseInt(t.timestamp) * 1000).toLocaleTimeString();
+                const color = t.type == 'BUY' ? '#4ade80' : '#f87171';
+                return `
+                                    <tr style="border-bottom:1px solid #333;">
+                                        <td style="color:${color}">${t.type}</td>
+                                        <td>${parseFloat(t.price).toFixed(4)}</td>
+                                        <td>${parseFloat(t.amountBase).toFixed(2)}</td>
+                                        <td>${parseFloat(t.amountQuote).toFixed(2)}</td>
+                                        <td style="color:#aaa">${date}</td>
+                                    </tr>
+                                `;
+            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function renderChart(containerId, candles) {
+            if (!candles || candles.length === 0) {
+                document.getElementById(containerId).innerText = "No candle data available.";
+                return;
+            }
+
+            const chart = LightweightCharts.createChart(document.getElementById(containerId), {
+                layout: { background: { color: '#1e293b' }, textColor: '#DDD' },
+                grid: { vertLines: { color: '#334155' }, horzLines: { color: '#334155' } },
+                width: document.getElementById(containerId).clientWidth,
+                height: 300,
+            });
+
+            const candlestickSeries = chart.addCandlestickSeries({
+                upColor: '#4ade80', downColor: '#f87171', borderVisible: false, wickUpColor: '#4ade80', wickDownColor: '#f87171',
+            });
+
+            const data = candles.map(c => ({
+                time: parseInt(c.time),
+                open: parseFloat(c.open),
+                high: parseFloat(c.high),
+                low: parseFloat(c.low),
+                close: parseFloat(c.close),
+            }));
+
+            // Sort just in case
+            data.sort((a, b) => a.time - b.time);
+
+            // Deduplicate times if needed (Lightweight charts errors on dupes)
+            const uniqueData = [];
+            const times = new Set();
+            for (let d of data) {
+                if (!times.has(d.time)) {
+                    times.add(d.time);
+                    uniqueData.push(d);
+                }
+            }
+
+            candlestickSeries.setData(uniqueData);
+            chart.timeScale().fitContent();
         }
 
         // Start
