@@ -34,6 +34,9 @@ const ALGEBRA_FACTORY_ADDRESS = Address.fromString("0xA0864cCA6E114013AB0e27cbd5
 const ZERO_ADDRESS = Address.fromString("0x0000000000000000000000000000000000000000")
 const Q96 = BigDecimal.fromString("79228162514264337593543950336")
 
+// Candle periods in seconds: 1 minute, 10 minutes, 1 hour
+const CANDLE_PERIODS: i32[] = [60, 600, 3600]
+
 // ============================================
 // 1. FUTARCHY PROPOSAL CREATION (Trading Core)
 // ============================================
@@ -290,7 +293,7 @@ export function handleSwap(event: Swap): void {
     pool.currentPrice = normalizedPrice
     pool.save()
 
-    updateCandle(pool, event.block.timestamp, normalizedPrice, event.params.amount0, event.params.amount1)
+    updateCandles(pool, event.block.timestamp, normalizedPrice, event.params.amount0, event.params.amount1)
 
     let tradeId = event.transaction.hash.concatI32(event.logIndex.toI32()).toHexString()
     let trade = new UnifiedTrade(tradeId)
@@ -442,11 +445,18 @@ function invert(price: BigDecimal): BigDecimal {
     return BigDecimal.fromString("1").div(price)
 }
 
-function updateCandle(pool: NormalizedPool, timestamp: BigInt, price: BigDecimal, amount0: BigInt, amount1: BigInt): void {
+function updateCandles(pool: NormalizedPool, timestamp: BigInt, price: BigDecimal, amount0: BigInt, amount1: BigInt): void {
+    // Update candles for all configured periods
+    for (let i = 0; i < CANDLE_PERIODS.length; i++) {
+        updateCandleForPeriod(pool, timestamp, price, amount0, amount1, CANDLE_PERIODS[i])
+    }
+}
+
+function updateCandleForPeriod(pool: NormalizedPool, timestamp: BigInt, price: BigDecimal, amount0: BigInt, amount1: BigInt, period: i32): void {
     let ts = timestamp.toI32()
-    let period = 3600
     let periodStart = (ts / period) * period
-    let id = pool.id + "-" + periodStart.toString()
+    // ID format: poolId-period-periodStart (e.g., "0x123...-60-1699920000")
+    let id = pool.id + "-" + period.toString() + "-" + periodStart.toString()
 
     let candle = UnifiedCandle.load(id)
     if (!candle) {
