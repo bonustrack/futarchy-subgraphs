@@ -1,33 +1,19 @@
-const axios = require('axios');
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
-const SUBGRAPH_URL = "https://api.studio.thegraph.com/query/1718249/futarchy-complete/v0.0.12";
+const SUBGRAPH_URL = "https://api.studio.thegraph.com/query/1718249/futarchy-complete/v0.0.16";
 
 async function main() {
+    const query = `{ _meta { block { number } deployment } }`;
     try {
-        const res = await axios.post(SUBGRAPH_URL, {
-            query: `{
-                _meta {
-                    block {
-                        number
-                    }
-                    hasIndexingErrors
-                }
-            }`
+        const response = await fetch(SUBGRAPH_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query })
         });
-
-        if (res.data.errors) {
-            console.log("GRAPH_ERROR");
-            console.error(JSON.stringify(res.data.errors));
-        } else if (res.data.data && res.data.data._meta) {
-            console.log(`BLOCK:${res.data.data._meta.block.number}`);
-            if (res.data.data._meta.hasIndexingErrors) console.log("INDEXING_ERRORS_DETECTED");
-        } else {
-            console.log("NO_DATA");
-        }
+        const json = await response.json();
+        console.log(JSON.stringify(json, null, 2));
     } catch (e) {
-        console.log("CONNECTION_FAIL");
-        console.error(e.message);
+        console.error(e);
     }
 }
-
 main();
