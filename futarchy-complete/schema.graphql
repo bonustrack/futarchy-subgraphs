@@ -1,6 +1,6 @@
 # Hypothetical Unified Schema
 
-type Aggregator @entity {
+type Aggregator @entity(immutable: false) {
   id: ID! # Contract Address
   name: String!
   description: String!
@@ -9,7 +9,7 @@ type Aggregator @entity {
   organizations: [Organization!]! @derivedFrom(field: "aggregator")
 }
 
-type Organization @entity {
+type Organization @entity(immutable: false) {
   id: ID! # Contract Address
   aggregator: Aggregator!
   name: String!
@@ -19,13 +19,13 @@ type Organization @entity {
   proposals: [UnifiedOneStopShop!]! @derivedFrom(field: "organization")
 }
 
-type UnifiedOneStopShop @entity {
+type UnifiedOneStopShop @entity(immutable: false) {
   id: ID! # Proposal Address (Trading Contract)
-  
+
   # Hierarchy (Nullable because a proposal might exist without metadata initially, or vice versa)
   organization: Organization
   metadataContract: Bytes # Address of the metadata contract
-  
+
   # Metadata
   title: String!
   description: String!
@@ -34,7 +34,7 @@ type UnifiedOneStopShop @entity {
   displayNameQuestion: String!
   resolutionDate: BigInt!
   createdAtTimestamp: BigInt!
-  
+
   # The Tokens
   companyToken: TokenInfo!
   currencyToken: TokenInfo!
@@ -54,35 +54,38 @@ type UnifiedOneStopShop @entity {
   poolPredictionNo: NormalizedPool
 }
 
-type TokenInfo @entity {
+type TokenInfo @entity(immutable: false) {
   id: ID!
   symbol: String!
   decimals: BigInt!
   name: String!
 }
 
-type NormalizedPool @entity {
+type NormalizedPool @entity(immutable: false) {
   id: ID! # Pool Address
-  
+
+  # Reverse lookup to proposal (for age-based candle tiering)
+  proposal: UnifiedOneStopShop
+
   # Basic Info
   baseToken: TokenInfo!
   quoteToken: TokenInfo!
-  
+
   # Internal: to know if we need to invert
-  isBaseToken0: Boolean! 
-  
+  isBaseToken0: Boolean!
+
   # Current State
-  currentPrice: BigDecimal! 
-  volume24h: BigDecimal!   
-  
+  currentPrice: BigDecimal!
+  volume24h: BigDecimal!
+
   # Candles
   candles: [UnifiedCandle!]! @derivedFrom(field: "pool")
-  
+
   # Recent Trades
   trades: [UnifiedTrade!]! @derivedFrom(field: "pool")
 }
 
-type UnifiedCandle @entity {
+type UnifiedCandle @entity(immutable: false) {
   id: ID! # poolId + period
   pool: NormalizedPool!
   time: BigInt!
@@ -94,7 +97,7 @@ type UnifiedCandle @entity {
   volume: BigDecimal!
 }
 
-type UnifiedTrade @entity {
+type UnifiedTrade @entity(immutable: true) {
   id: ID!
   pool: NormalizedPool!
   timestamp: BigInt!
@@ -107,7 +110,7 @@ type UnifiedTrade @entity {
 }
 
 # Needed for linking logic
-type PoolLookup @entity {
+type PoolLookup @entity(immutable: false) {
   id: ID! # Pool Address
   pool: NormalizedPool!
 }

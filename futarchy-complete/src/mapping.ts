@@ -34,6 +34,11 @@ const ALGEBRA_FACTORY_ADDRESS = Address.fromString("0xA0864cCA6E114013AB0e27cbd5
 const ZERO_ADDRESS = Address.fromString("0x0000000000000000000000000000000000000000")
 const Q96 = BigDecimal.fromString("79228162514264337593543950336")
 
+// Candle periods in seconds: 1 minute, 10 minutes, 1 hour
+const CANDLE_PERIODS: i32[] = [60, 600, 3600]
+// Max age (in seconds) for each period: 24 hours, 7 days, 0 = unlimited
+const CANDLE_MAX_AGES: i32[] = [86400, 604800, 0]
+
 // ============================================
 // 1. FUTARCHY PROPOSAL CREATION (Trading Core)
 // ============================================
@@ -279,6 +284,9 @@ export function handleSwap(event: Swap): void {
     let pool = NormalizedPool.load(poolId)
     if (!pool) return
 
+    // Only process swaps for pools linked to futarchy proposals
+    if (!pool.proposal) return
+
     let token0Params = TokenInfo.load(pool.baseToken)
     let token1Params = TokenInfo.load(pool.quoteToken)
     let d0 = token0Params ? BigInt.fromString(token0Params.decimals.toString()) : BigInt.fromI32(18)
@@ -290,7 +298,7 @@ export function handleSwap(event: Swap): void {
     pool.currentPrice = normalizedPrice
     pool.save()
 
-    updateCandle(pool, event.block.timestamp, normalizedPrice, event.params.amount0, event.params.amount1)
+    updateCandles(pool, event.block.timestamp, normalizedPrice, event.params.amount0, event.params.amount1)
 
     let tradeId = event.transaction.hash.concatI32(event.logIndex.toI32()).toHexString()
     let trade = new UnifiedTrade(tradeId)
@@ -365,7 +373,9 @@ function findAndLinkPool(factory: AlgebraFactory, tA: Address, tB: Address, base
         let poolId = call.value.toHexString()
         let pool = NormalizedPool.load(poolId)
         if (pool) {
-            // Found it!
+            // Link pool back to proposal for age-based candle tiering
+            pool.proposal = proposalId.toHexString()
+            pool.save()
             return poolId
         }
         // If pool is returned by factory but NOT indexed yet
@@ -442,11 +452,31 @@ function invert(price: BigDecimal): BigDecimal {
     return BigDecimal.fromString("1").div(price)
 }
 
-function updateCandle(pool: NormalizedPool, timestamp: BigInt, price: BigDecimal, amount0: BigInt, amount1: BigInt): void {
+function updateCandles(pool: NormalizedPool, timestamp: BigInt, price: BigDecimal, amount0: BigInt, amount1: BigInt): void {
+    // Calculate proposal age for tiered candle creation
+    let proposalAge: i32 = 0
+    if (pool.proposal) {
+        let proposal = UnifiedOneStopShop.load(pool.proposal!)
+        if (proposal && proposal.createdAtTimestamp.gt(BigInt.zero())) {
+            proposalAge = timestamp.minus(proposal.createdAtTimestamp).toI32()
+        }
+    }
+
+    // Update candles for each period based on age limits
+    for (let i = 0; i < CANDLE_PERIODS.length; i++) {
+        let maxAge = CANDLE_MAX_AGES[i]
+        // 0 means unlimited, otherwise check if within max age
+        if (maxAge == 0 || proposalAge < maxAge) {
+            updateCandleForPeriod(pool, timestamp, price, amount0, amount1, CANDLE_PERIODS[i])
+        }
+    }
+}
+
+function updateCandleForPeriod(pool: NormalizedPool, timestamp: BigInt, price: BigDecimal, amount0: BigInt, amount1: BigInt, period: i32): void {
     let ts = timestamp.toI32()
-    let period = 3600
     let periodStart = (ts / period) * period
-    let id = pool.id + "-" + periodStart.toString()
+    // ID format: poolId-period-periodStart (e.g., "0x123...-60-1699920000")
+    let id = pool.id + "-" + period.toString() + "-" + periodStart.toString()
 
     let candle = UnifiedCandle.load(id)
     if (!candle) {
