@@ -36,6 +36,8 @@ const Q96 = BigDecimal.fromString("79228162514264337593543950336")
 
 // Candle periods in seconds: 1 minute, 10 minutes, 1 hour
 const CANDLE_PERIODS: i32[] = [60, 600, 3600]
+// Max age (in seconds) for each period: 24 hours, 7 days, 0 = unlimited
+const CANDLE_MAX_AGES: i32[] = [86400, 604800, 0]
 
 // ============================================
 // 1. FUTARCHY PROPOSAL CREATION (Trading Core)
@@ -368,7 +370,9 @@ function findAndLinkPool(factory: AlgebraFactory, tA: Address, tB: Address, base
         let poolId = call.value.toHexString()
         let pool = NormalizedPool.load(poolId)
         if (pool) {
-            // Found it!
+            // Link pool back to proposal for age-based candle tiering
+            pool.proposal = proposalId.toHexString()
+            pool.save()
             return poolId
         }
         // If pool is returned by factory but NOT indexed yet
@@ -446,9 +450,22 @@ function invert(price: BigDecimal): BigDecimal {
 }
 
 function updateCandles(pool: NormalizedPool, timestamp: BigInt, price: BigDecimal, amount0: BigInt, amount1: BigInt): void {
-    // Update candles for all configured periods
+    // Calculate proposal age for tiered candle creation
+    let proposalAge: i32 = 0
+    if (pool.proposal) {
+        let proposal = UnifiedOneStopShop.load(pool.proposal!)
+        if (proposal && proposal.createdAtTimestamp.gt(BigInt.zero())) {
+            proposalAge = timestamp.minus(proposal.createdAtTimestamp).toI32()
+        }
+    }
+
+    // Update candles for each period based on age limits
     for (let i = 0; i < CANDLE_PERIODS.length; i++) {
-        updateCandleForPeriod(pool, timestamp, price, amount0, amount1, CANDLE_PERIODS[i])
+        let maxAge = CANDLE_MAX_AGES[i]
+        // 0 means unlimited, otherwise check if within max age
+        if (maxAge == 0 || proposalAge < maxAge) {
+            updateCandleForPeriod(pool, timestamp, price, amount0, amount1, CANDLE_PERIODS[i])
+        }
     }
 }
 
