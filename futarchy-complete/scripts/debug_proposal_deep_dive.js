@@ -2,7 +2,7 @@ const { ethers } = require('ethers');
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 const SUBGRAPH_URL = "https://api.studio.thegraph.com/query/1718249/futarchy-complete/v0.0.16";
-const GNOSIS_PROPOSAL_ID = "0x7e9fc0c3d6c1619d4914556ad2dee6051ce68418";
+const GNOSIS_PROPOSAL_ID = "0x9590daf4d5cd4009c3f9767c5e7668175cfd37cf";
 const RPC_URL = "https://rpc.gnosischain.com";
 const ALGEBRA_FACTORY = "0xA0864cCA6E114013AB0e27cbd5B6f4c8947da766";
 

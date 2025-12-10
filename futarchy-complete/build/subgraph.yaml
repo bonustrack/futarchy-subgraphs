@@ -8,7 +8,7 @@ dataSources:
     source:
       address: "0xa6cB18FCDC17a2B44E5cAd2d80a6D5942d30a345"
       abi: FutarchyFactory
-      startBlock: 42850000
+      startBlock: 40600000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -34,7 +34,7 @@ dataSources:
     source:
       address: "0xA0864cCA6E114013AB0e27cbd5B6f4c8947da766"
       abi: AlgebraFactory
-      startBlock: 42850000
+      startBlock: 40600000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -60,7 +60,7 @@ dataSources:
     source:
       address: "0x511D18d5567d76bbd20dEaDF4F90CD9f039eEd2D"
       abi: Creator
-      startBlock: 42850000
+      startBlock: 40600000
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7

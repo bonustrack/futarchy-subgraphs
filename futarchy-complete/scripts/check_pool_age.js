@@ -1,7 +1,7 @@
 const { ethers } = require('ethers');
 
 const RPC_URL = "https://rpc.gnosischain.com";
-const POOL_ADDRESS = "0xd8c19654Bd52CbaC4FE60D2C4477987894F14e1c"; // The missing pool
+const POOL_ADDRESS = "0x4fF34E270CA54944955b2F595CeC4CF53BDc9e0c"; // The missing pool
 
 async function main() {
     const provider = new ethers.JsonRpcProvider(RPC_URL);
