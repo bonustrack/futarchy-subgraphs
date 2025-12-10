@@ -284,6 +284,9 @@ export function handleSwap(event: Swap): void {
     let pool = NormalizedPool.load(poolId)
     if (!pool) return
 
+    // Only process swaps for pools linked to futarchy proposals
+    if (!pool.proposal) return
+
     let token0Params = TokenInfo.load(pool.baseToken)
     let token1Params = TokenInfo.load(pool.quoteToken)
     let d0 = token0Params ? BigInt.fromString(token0Params.decimals.toString()) : BigInt.fromI32(18)
