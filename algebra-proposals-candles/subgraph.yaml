@@ -1,0 +1,76 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  # 1. Futarchy Factory - To Whitelist Tokens
+  - kind: ethereum
+    name: FutarchyFactory
+    network: gnosis
+    source:
+      address: "0xa6cB18FCDC17a2B44E5cAd2d80a6D5942d30a345"
+      abi: FutarchyFactory
+      startBlock: 43512812
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - WhitelistedToken
+      abis:
+        - name: FutarchyFactory
+          file: ./abis/FutarchyFactory.json
+        - name: FutarchyProposal
+          file: ./abis/FutarchyProposal.json
+        - name: ERC20
+          file: ./abis/ERC20.json
+      eventHandlers:
+        - event: NewProposal(indexed address,string,bytes32,bytes32)
+          handler: handleNewProposal
+      file: ./src/mapping.ts
+
+  # 2. Algebra Factory - To Index Pools (Filtered)
+  - kind: ethereum
+    name: AlgebraFactory
+    network: gnosis
+    source:
+      address: "0xa0864cca6e114013ab0e27cbd5b6f4c8947da766"
+      abi: AlgebraFactory
+      startBlock: 43512812
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Pool
+      abis:
+        - name: AlgebraFactory
+          file: ./abis/AlgebraFactory.json
+        - name: ERC20
+          file: ./abis/ERC20.json
+        - name: AlgebraPool
+          file: ./abis/AlgebraPool.json
+      eventHandlers:
+        - event: Pool(indexed address,indexed address,address)
+          handler: handlePoolCreated
+      file: ./src/mapping.ts
+
+templates:
+  - kind: ethereum/contract
+    name: AlgebraPool
+    network: gnosis
+    source:
+      abi: AlgebraPool
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Pool
+        - Candle
+      abis:
+        - name: AlgebraPool
+          file: ./abis/AlgebraPool.json
+      eventHandlers:
+        - event: Swap(indexed address,indexed address,int256,int256,uint160,uint128,int24)
+          handler: handleSwap
+      file: ./src/mapping.ts

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Algebra Subgraph Candles</title>
+    <script src="https://unpkg.com/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111;
+            color: #eee;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        input {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #444;
+            background: #222;
+            color: white;
+            width: 350px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            background: #2962ff;
+            color: white;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #1e4bd8;
+        }
+
+        button.secondary {
+            background: #444;
+        }
+
+        button.active {
+            background: #00e676;
+            color: #000;
+        }
+
+        #chart {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #333;
+            display: none;
+        }
+
+        /* Hidden by default */
+        #object-visualizer {
+            width: 100%;
+            min-height: 400px;
+            border: 1px solid #333;
+            background: #181818;
+            padding: 15px;
+            font-family: 'Fira Code', 'Courier New', monospace;
+            white-space: pre-wrap;
+            color: #a5d6ff;
+            overflow-y: auto;
+            max-height: 700px;
+        }
+
+        .status {
+            color: #888;
+            font-size: 0.9em;
+            margin-left: auto;
+        }
+
+        .json-key {
+            color: #79c0ff;
+        }
+
+        .json-string {
+            color: #a5d6ff;
+        }
+
+        .json-number {
+            color: #79c0ff;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="controls">
+        <input type="text" id="poolAddress" value="0x36d46321ca07e822a6b71e31046dbb4a6f09e415"
+            placeholder="Pool Address">
+        <button onclick="loadData()">Load Data</button>
+        <button class="secondary" id="invertBtn" onclick="toggleInvert()">Invert Price: OFF</button>
+
+        <!-- View Toggles -->
+        <div style="margin-left: 20px; display: flex; gap: 5px;">
+            <button id="btn-obj" class="active" onclick="setMode('object')">Object Visualizer</button>
+            <button id="btn-chart" class="secondary" onclick="setMode('chart')">Chart Chart</button>
+        </div>
+
+        <span class="status" id="status">Ready</span>
+    </div>
+
+    <!-- Data Containers -->
+    <div id="object-visualizer">Click "Load Data" to view candles...</div>
+    <div id="chart"></div>
+
+    <script>
+        // State
+        let RAW_DATA = [];
+        let IS_INVERTED = false;
+        let VIEW_MODE = 'object'; // 'object' or 'chart'
+        let chart;
+        let candleSeries;
+
+        const CHART_CONTAINER = document.getElementById('chart');
+        const OBJ_CONTAINER = document.getElementById('object-visualizer');
+        const SUBGRAPH_URL = "https://api.studio.thegraph.com/query/1718249/algebra-candles/v0.0.3";
+
+        // ------------------------------------------------------
+        // Initialization
+        // ------------------------------------------------------
+        try {
+            chart = LightweightCharts.createChart(CHART_CONTAINER, {
+                layout: { background: { type: 'solid', color: '#111' }, textColor: '#DDD' },
+                grid: { vertLines: { color: '#333' }, horzLines: { color: '#333' } },
+                crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                timeScale: { timeVisible: true, secondsVisible: false },
+            });
+
+            candleSeries = chart.addCandlestickSeries({
+                upColor: '#26a69a', downColor: '#ef5350', borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+                priceFormat: { type: 'price', precision: 8, minMove: 0.00000001 },
+            });
+
+            new ResizeObserver(entries => {
+                if (entries.length === 0 || entries[0].target !== CHART_CONTAINER) { return; }
+                const newRect = entries[0].contentRect;
+                chart.applyOptions({ height: newRect.height, width: newRect.width });
+            }).observe(CHART_CONTAINER);
+
+        } catch (error) {
+            console.error("Chart init failed:", error);
+        }
+
+        // ------------------------------------------------------
+        // Data Loading
+        // ------------------------------------------------------
+        async function loadData() {
+            const address = document.getElementById('poolAddress').value.toLowerCase();
+            const statusFn = (msg) => document.getElementById('status').innerText = msg;
+
+            statusFn("Loading...");
+
+            // Querying last 1000 candles
+            const query = `
+            {
+                candles(
+                    where: { pool: "${address}" }
+                    orderBy: periodStartUnix
+                    orderDirection: asc
+                    first: 1000
+                ) {
+                    periodStartUnix
+                    open
+                    high
+                    low
+                    close
+                    volumeToken0
+                }
+            }`;
+
+            try {
+                const res = await fetch(SUBGRAPH_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+
+                const json = await res.json();
+
+                if (json.errors) throw new Error(JSON.stringify(json.errors));
+                if (!json.data || !json.data.candles || json.data.candles.length === 0) {
+                    statusFn("No data found for this pool.");
+                    OBJ_CONTAINER.innerText = "No data found.";
+                    return;
+                }
+
+                RAW_DATA = json.data.candles.map(c => ({
+                    time: c.periodStartUnix,
+                    open: parseFloat(c.open),
+                    high: parseFloat(c.high),
+                    low: parseFloat(c.low),
+                    close: parseFloat(c.close),
+                    volume: parseFloat(c.volumeToken0)
+                }));
+
+                updateView();
+                statusFn(`Loaded ${RAW_DATA.length} candles.`);
+
+            } catch (err) {
+                console.error(err);
+                statusFn("Error loading data.");
+                OBJ_CONTAINER.innerText = "Error loading data.";
+            }
+        }
+
+        // ------------------------------------------------------
+        // View Logic
+        // ------------------------------------------------------
+        function setMode(mode) {
+            VIEW_MODE = mode;
+
+            // Toggle Buttons
+            document.getElementById('btn-obj').className = mode === 'object' ? 'active' : 'secondary';
+            document.getElementById('btn-chart').className = mode === 'chart' ? 'active' : 'secondary';
+
+            // Toggle Visibility
+            CHART_CONTAINER.style.display = mode === 'chart' ? 'block' : 'none';
+            OBJ_CONTAINER.style.display = mode === 'object' ? 'block' : 'none';
+
+            updateView();
+        }
+
+        function toggleInvert() {
+            IS_INVERTED = !IS_INVERTED;
+            document.getElementById('invertBtn').innerText = `Invert Price: ${IS_INVERTED ? 'ON' : 'OFF'}`;
+            updateView();
+        }
+
+        function updateView() {
+            const data = processData();
+
+            if (VIEW_MODE === 'object') {
+                renderObjectView(data);
+            } else {
+                renderChartView(data);
+            }
+        }
+
+        function processData() {
+            if (RAW_DATA.length === 0) return [];
+
+            return RAW_DATA.map(d => {
+                if (IS_INVERTED) {
+                    return {
+                        time: d.time,
+                        open: 1 / d.open,
+                        high: 1 / d.low,  // Swap High/Low
+                        low: 1 / d.high,  // Swap High/Low
+                        close: 1 / d.close,
+                        volume: d.volume // Volume stays same? Or invert denomination? Usually volume is jus volume.
+                    };
+                }
+                return d;
+            });
+        }
+
+        function renderChartView(data) {
+            if (!candleSeries) return;
+            candleSeries.setData(data);
+            chart.priceScale('right').applyOptions({ autoScale: true });
+            chart.timeScale().fitContent();
+        }
+
+        function renderObjectView(data) {
+            // Pretty print nicely formatted JSON
+            // We'll reverse it to show newest first for object view? Or keep standard?
+            // User requested "arrays beautiful of the objects"
+            const jsonStr = JSON.stringify(data, null, 2);
+            OBJ_CONTAINER.innerHTML = syntaxHighlight(jsonStr);
+        }
+
+        // Helper to colorize JSON
+        function syntaxHighlight(json) {
+            json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                var cls = 'json-number';
+                if (/^"/.test(match)) {
+                    if (/:$/.test(match)) {
+                        cls = 'json-key';
+                    } else {
+                        cls = 'json-string';
+                    }
+                } else if (/true|false/.test(match)) {
+                    cls = 'json-boolean';
+                } else if (/null/.test(match)) {
+                    cls = 'json-null';
+                }
+                return '<span class="' + cls + '">' + match + '</span>';
+            });
+        }
+
+        // Start
+        loadData();
+
+    </script>
+</body>
+
+</html>

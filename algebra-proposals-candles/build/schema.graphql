@@ -1,0 +1,37 @@
+type WhitelistedToken @entity {
+  id: ID! # Token Address
+  symbol: String
+  role: String! # "BASE" or "QUOTE"
+}
+
+type Pool @entity {
+  id: ID!
+  token0: Bytes!
+  token1: Bytes!
+  fee: BigInt!
+  liquidity: BigInt!
+  sqrtPrice: BigInt!
+  tick: BigInt!
+  
+  # Normalization Flags
+  isInverted: Boolean!
+
+  candles: [Candle!]! @derivedFrom(field: "pool")
+}
+
+type Candle @entity {
+  id: ID!
+  time: BigInt!
+  periodStartUnix: BigInt!
+  pool: Pool!
+  block: BigInt!
+  
+  open: BigDecimal!
+  high: BigDecimal!
+  low: BigDecimal!
+  close: BigDecimal!
+  
+  volumeToken0: BigDecimal!
+  volumeToken1: BigDecimal!
+  volumeUSD: BigDecimal!
+}
