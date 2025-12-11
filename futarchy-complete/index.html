@@ -44,8 +44,14 @@
         .pool-row {
             display: flex;
             justify-content: space-between;
-            padding: 5px 0;
+            padding: 8px 10px;
             border-bottom: 1px solid #333;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .pool-row:hover {
+            background: #334155;
         }
 
         h1 {
@@ -55,28 +61,40 @@
         .active {
             color: #4ade80;
         }
+
+        .section-title {
+            margin-top: 30px;
+            border-top: 1px solid #333;
+            padding-top: 20px;
+        }
     </style>
 </head>
 
 <body>
 
-    <h1>Unified Futarchy Explorer (v0.0.3)</h1>
+    <h1>Unified Futarchy Explorer (v0.0.4 w/ Candles Only)</h1>
     <p>NavPath: <span id="nav-path">Home</span></p>
     <button onclick="loadAggregators()">Home (Aggregators)</button>
 
     <div id="content" class="grid"></div>
 
     <script>
-        const API_URL = "https://api.studio.thegraph.com/query/1718249/futarchy-complete/v0.0.15";
+        const API_URL = "https://api.studio.thegraph.com/query/1718249/futarchy-complete/v0.0.21";
+        const API_URL_CANDLES = "https://api.studio.thegraph.com/query/1718249/algebra-candles/v0.0.4";
 
-        async function gql(query) {
-            const res = await fetch(API_URL, {
+        let currentChart = null;
+
+        async function gql(query, url = API_URL) {
+            const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ query })
             });
             const json = await res.json();
             if (json.errors) {
+                console.error("GQL Error:", json.errors);
+                if (url === API_URL_CANDLES) return { data: {} };
+
                 document.getElementById('content').innerText = "Error: " + JSON.stringify(json.errors);
                 throw new Error(json.errors[0].message);
             }
@@ -111,7 +129,6 @@
 
         async function loadProposals(orgId, orgName) {
             document.getElementById('nav-path').innerText = `${orgName} > Proposals`;
-            // Note: We use the unifiedOneStopShop entities linked to the organization
             const data = await gql(`{ organization(id: "${orgId}") { name, proposals { id, title, description, marketName, displayNameEvent, displayNameQuestion, 
                 poolConditionalYes { id currentPrice } 
             } } }`);
@@ -130,6 +147,7 @@
 
         async function loadDetail(id) {
             document.getElementById('nav-path').innerText = `Proposal ${id}`;
+            // 1. Fetch all pools from Futarchy Complete
             const data = await gql(`
                 { 
                     unifiedOneStopShop(id: "${id}") { 
@@ -139,22 +157,22 @@
                         
                         outcomeYesCompany outcomeNoCompany outcomeYesCurrency outcomeNoCurrency
 
-                        poolConditionalYes { 
-                            id currentPrice volume24h 
-                            trades(orderBy: timestamp, orderDirection: desc, first: 10) { id type price amountBase amountQuote timestamp }
-                            candles(orderBy: time, orderDirection: asc, first: 1000) { time open high low close volume }
-                        }
+                        poolConditionalYes { id currentPrice volume24h }
                         poolConditionalNo { id currentPrice volume24h }
+                        poolExpectedYes { id currentPrice volume24h }
+                        poolExpectedNo { id currentPrice volume24h }
                         poolPredictionYes { id currentPrice volume24h }
+                        poolPredictionNo { id currentPrice volume24h }
                     } 
                 }
             `);
             const p = data.unifiedOneStopShop;
+
             const html = `
                 <div style="grid-column: 1 / -1; background:#1e293b; padding:20px; border-radius:8px;">
-                    <h2>${p.displayNameQuestion}</h2>
+                    <h2>${p.marketName || 'Market'}</h2>
                     <h3 style="color:#a78bfa">${p.displayNameEvent}</h3>
-                    <p>${p.description}</p>
+                    <p style="color:#ccc">${p.displayNameQuestion}</p>
 
                     <div style="background:#0f172a; padding:10px; margin-top:10px; border-radius:4px; font-family:monospace; font-size:0.8em;">
                         <strong>Outcomes:</strong><br>
@@ -163,82 +181,98 @@
                     </div>
                     
                     <div style="margin-top:20px;">
-                        <h4>Pools Overview</h4>
+                        <h4>Pools (Click to Load Chart)</h4>
                         ${renderPoolRow("Conditional YES", p.poolConditionalYes)}
                         ${renderPoolRow("Conditional NO", p.poolConditionalNo)}
+                        ${renderPoolRow("Expected YES", p.poolExpectedYes)}
+                        ${renderPoolRow("Expected NO", p.poolExpectedNo)}
                         ${renderPoolRow("Prediction YES", p.poolPredictionYes)}
+                        ${renderPoolRow("Prediction NO", p.poolPredictionNo)}
                     </div>
 
-                    ${p.poolConditionalYes ? renderDeepDive("Conditional YES", p.poolConditionalYes) : ''}
+                    <div id="deep-dive-section" class="section-title">
+                        <h3 id="chart-title">Select a pool to view details</h3>
+                        <div id="chart-container" style="height: 300px; width:100%; margin-bottom:20px;"></div>
+                    </div>
                 </div>
             `;
             document.getElementById('content').innerHTML = html;
 
+            // Auto-load Conditional YES if it exists
             if (p.poolConditionalYes) {
-                renderChart(`chart-${p.poolConditionalYes.id}`, p.poolConditionalYes.candles);
+                loadPoolDeepDive(p.poolConditionalYes.id, "Conditional YES");
             }
         }
 
         function renderPoolRow(name, pool) {
-            if (!pool) return `<div class="pool-row"><span>${name}</span> <span style="color:red">Not Found</span></div>`;
+            if (!pool) return `<div class="pool-row" style="opacity:0.5; cursor:default;"><span>${name}</span> <span style="color:#d99">Not Found</span></div>`;
             return `
-                <div class="pool-row">
+                <div class="pool-row" onclick="loadPoolDeepDive('${pool.id}', '${name}')">
                     <span>${name}</span> 
-                    <span>Price: <b class="active">$${parseFloat(pool.currentPrice).toFixed(4)}</b></span>
-                    <span>Vol: ${parseFloat(pool.volume24h).toFixed(2)}</span>
+                    <span style="font-family:monospace; font-size:0.9em; color:#aaa;">${pool.id}</span>
+                    <span>$${parseFloat(pool.currentPrice).toFixed(4)}</span>
                 </div>`;
         }
 
-        function renderDeepDive(name, pool) {
-            return `
-                <div style="margin-top:30px; border-top:1px solid #333; padding-top:20px;">
-                    <h3>${name} Deep Dive</h3>
-                    
-                    <!-- CHART -->
-                    <div id="chart-${pool.id}" style="height: 300px; width:100%; margin-bottom:20px;"></div>
+        async function loadPoolDeepDive(poolId, poolName) {
+            document.getElementById('chart-title').innerText = `${poolName} Deep Dive (${poolId})`;
+            // document.getElementById('trades-container').innerHTML = "<p>Loading...</p>";
+            document.getElementById('chart-container').innerHTML = ""; // Clear chart
 
-                    <!-- TRADES -->
-                    <h4>Recent Trades</h4>
-                    <table style="width:100%; text-align:left; border-collapse:collapse; font-size:0.9em;">
-                        <thead>
-                            <tr style="border-bottom:1px solid #555;">
-                                <th>Ver</th>
-                                <th>Price</th>
-                                <th>Base</th>
-                                <th>Quote</th>
-                                <th>Time</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${pool.trades.map(t => {
-                const date = new Date(parseInt(t.timestamp) * 1000).toLocaleTimeString();
-                const color = t.type == 'BUY' ? '#4ade80' : '#f87171';
-                return `
-                                    <tr style="border-bottom:1px solid #333;">
-                                        <td style="color:${color}">${t.type}</td>
-                                        <td>${parseFloat(t.price).toFixed(4)}</td>
-                                        <td>${parseFloat(t.amountBase).toFixed(2)}</td>
-                                        <td>${parseFloat(t.amountQuote).toFixed(2)}</td>
-                                        <td style="color:#aaa">${date}</td>
-                                    </tr>
-                                `;
-            }).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `;
+            // Fetch Candles ONLY (Trades removed due to schema mismatch in v0.0.4)
+            const res = await gql(`
+                {
+                    candles(where: { pool: "${poolId}" }, orderBy: periodStartUnix, orderDirection: asc, first: 1000) {
+                        periodStartUnix open high low close
+                    }
+                }
+            `, API_URL_CANDLES);
+
+            if (!res || !res.candles) {
+                document.getElementById('chart-container').innerHTML = "<p>No data found for this pool.</p>";
+                return;
+            }
+
+            // Render Chart
+            const candles = res.candles.map(c => ({
+                time: parseInt(c.periodStartUnix),
+                open: parseFloat(c.open),
+                high: parseFloat(c.high),
+                low: parseFloat(c.low),
+                close: parseFloat(c.close)
+            }));
+
+            // Sort
+            candles.sort((a, b) => a.time - b.time);
+
+            // Dedupe
+            const uniqueData = [];
+            const times = new Set();
+            for (let d of candles) {
+                if (!times.has(d.time)) {
+                    times.add(d.time);
+                    uniqueData.push(d);
+                }
+            }
+
+            renderChart('chart-container', uniqueData);
         }
 
-        function renderChart(containerId, candles) {
-            if (!candles || candles.length === 0) {
+        function renderChart(containerId, data) {
+            if (currentChart) {
+                // remove() method might not identify properly if we just clear HTML, but let's try to be clean
+            }
+
+            if (data.length === 0) {
                 document.getElementById(containerId).innerText = "No candle data available.";
                 return;
             }
 
-            const chart = LightweightCharts.createChart(document.getElementById(containerId), {
+            const container = document.getElementById(containerId);
+            const chart = LightweightCharts.createChart(container, {
                 layout: { background: { color: '#1e293b' }, textColor: '#DDD' },
                 grid: { vertLines: { color: '#334155' }, horzLines: { color: '#334155' } },
-                width: document.getElementById(containerId).clientWidth,
+                width: container.clientWidth,
                 height: 300,
             });
 
@@ -246,28 +280,7 @@
                 upColor: '#4ade80', downColor: '#f87171', borderVisible: false, wickUpColor: '#4ade80', wickDownColor: '#f87171',
             });
 
-            const data = candles.map(c => ({
-                time: parseInt(c.time),
-                open: parseFloat(c.open),
-                high: parseFloat(c.high),
-                low: parseFloat(c.low),
-                close: parseFloat(c.close),
-            }));
-
-            // Sort just in case
-            data.sort((a, b) => a.time - b.time);
-
-            // Deduplicate times if needed (Lightweight charts errors on dupes)
-            const uniqueData = [];
-            const times = new Set();
-            for (let d of data) {
-                if (!times.has(d.time)) {
-                    times.add(d.time);
-                    uniqueData.push(d);
-                }
-            }
-
-            candlestickSeries.setData(uniqueData);
+            candlestickSeries.setData(data);
             chart.timeScale().fitContent();
         }
 
