@@ -6,14 +6,12 @@ import { AggregatorMetadataCreated } from "../generated/Creator/Creator"
 import { OrganizationAdded, AggregatorInfoUpdated } from "../generated/templates/AggregatorTemplate/Aggregator"
 import { ProposalAdded, CompanyInfoUpdated } from "../generated/templates/OrganizationTemplate/Organization"
 import { MetadataUpdated, Proposal as MetadataContract } from "../generated/templates/ProposalTemplate/Proposal"
-import { Swap } from "../generated/templates/AlgebraPool/AlgebraPool"
+// import { Swap } from "../generated/templates/AlgebraPool/AlgebraPool"
 import { ERC20 } from "../generated/FutarchyFactory/ERC20"
 
 import {
     UnifiedOneStopShop,
     NormalizedPool,
-    UnifiedCandle,
-    UnifiedTrade,
     TokenInfo,
     PoolLookup,
     Aggregator,
@@ -21,7 +19,7 @@ import {
 } from "../generated/schema"
 
 import {
-    AlgebraPool,
+    // AlgebraPool,
     AggregatorTemplate,
     OrganizationTemplate,
     ProposalTemplate
@@ -214,50 +212,54 @@ function linkProposalToOrganization(metadataAddr: Address, orgId: string): void 
     let dCall = contract.try_description()
     entity.description = !dCall.reverted ? dCall.value : "Loading..."
 
-    // 5. HEAL: Retry fetching Tokens & Pools
-    let tknCheck = TokenInfo.load(entity.companyToken)
-    let needsHeal = !tknCheck || tknCheck.symbol == "UNK" || entity.companyToken == ZERO_ADDRESS.toHexString() || entity.poolConditionalYes == null
+    // 5. REGISTRY: Always fetch Tokens & Pools (Treat Metadata as primary source)
+    let tradeContract = FutarchyProposal.bind(tradingProposalId)
 
-    if (needsHeal) {
-        log.info("Healing Proposal: {}", [tradingProposalId.toHexString()])
-        let tradeContract = FutarchyProposal.bind(tradingProposalId)
+    let col1Call = tradeContract.try_collateralToken1()
+    let col2Call = tradeContract.try_collateralToken2()
 
-        let col1Call = tradeContract.try_collateralToken1()
-        let col2Call = tradeContract.try_collateralToken2()
-
-        if (!col1Call.reverted && !col2Call.reverted) {
-            let c1 = col1Call.value
-            let c2 = col2Call.value
-
-            entity.companyToken = createTokenInfo(c1)
-            entity.currencyToken = createTokenInfo(c2)
-
-            // Retry Pools
-            let w0 = getWrapped(tradeContract, 0)
-            let w1 = getWrapped(tradeContract, 1)
-            let w2 = getWrapped(tradeContract, 2)
-            let w3 = getWrapped(tradeContract, 3)
-
-            // Save Outcomes
-            entity.outcomeYesCompany = w0.toHexString()
-            entity.outcomeNoCompany = w1.toHexString()
-            entity.outcomeYesCurrency = w2.toHexString()
-            entity.outcomeNoCurrency = w3.toHexString()
-
-            // Log details for debugging
-            log.info("Tokens: c1={}, c2={}, w0={}", [c1.toHexString(), c2.toHexString(), w0.toHexString()])
-
-            let factory = AlgebraFactory.bind(ALGEBRA_FACTORY_ADDRESS)
-
-            if (!entity.poolConditionalYes) entity.poolConditionalYes = findAndLinkPool(factory, w0, w2, true, tradingProposalId)
-            if (!entity.poolConditionalNo) entity.poolConditionalNo = findAndLinkPool(factory, w1, w3, true, tradingProposalId)
-            if (!entity.poolExpectedYes) entity.poolExpectedYes = findAndLinkPool(factory, w0, c2, true, tradingProposalId)
-            if (!entity.poolExpectedNo) entity.poolExpectedNo = findAndLinkPool(factory, w1, c2, true, tradingProposalId)
-            if (!entity.poolPredictionYes) entity.poolPredictionYes = findAndLinkPool(factory, w2, c2, true, tradingProposalId)
-            if (!entity.poolPredictionNo) entity.poolPredictionNo = findAndLinkPool(factory, w3, c2, true, tradingProposalId)
-        } else {
-            log.warning("Healing Failed: Could not fetch collateral tokens", [])
+    // FETCH MARKET NAME (Fixes "Initializing..." for backfilled proposals)
+    let mNameCall = tradeContract.try_marketName()
+    if (!mNameCall.reverted) {
+        entity.marketName = mNameCall.value
+        // Update Title priority if currently default
+        if (entity.title == "Loading..." || entity.title == "Initializing...") {
+            entity.title = mNameCall.value
         }
+    }
+
+    if (!col1Call.reverted && !col2Call.reverted) {
+        let c1 = col1Call.value
+        let c2 = col2Call.value
+
+        entity.companyToken = createTokenInfo(c1)
+        entity.currencyToken = createTokenInfo(c2)
+
+        // Retry Pools
+        let w0 = getWrapped(tradeContract, 0)
+        let w1 = getWrapped(tradeContract, 1)
+        let w2 = getWrapped(tradeContract, 2)
+        let w3 = getWrapped(tradeContract, 3)
+
+        // Save Outcomes
+        entity.outcomeYesCompany = w0.toHexString()
+        entity.outcomeNoCompany = w1.toHexString()
+        entity.outcomeYesCurrency = w2.toHexString()
+        entity.outcomeNoCurrency = w3.toHexString()
+
+        // Log details for debugging
+        // log.info("Tokens: c1={}, c2={}, w0={}", [c1.toHexString(), c2.toHexString(), w0.toHexString()])
+
+        let factory = AlgebraFactory.bind(ALGEBRA_FACTORY_ADDRESS)
+
+        entity.poolConditionalYes = findAndLinkPool(factory, w0, w2, true, tradingProposalId)
+        entity.poolConditionalNo = findAndLinkPool(factory, w1, w3, true, tradingProposalId)
+        entity.poolExpectedYes = findAndLinkPool(factory, w0, c2, true, tradingProposalId)
+        entity.poolExpectedNo = findAndLinkPool(factory, w1, c2, true, tradingProposalId)
+        entity.poolPredictionYes = findAndLinkPool(factory, w2, c2, true, tradingProposalId)
+        entity.poolPredictionNo = findAndLinkPool(factory, w3, c2, true, tradingProposalId)
+    } else {
+        log.warning("Registry Failed: Could not fetch collateral tokens for prop {}", [tradingProposalId.toHexString()])
     }
 
     entity.save()
@@ -269,16 +271,20 @@ function linkProposalToOrganization(metadataAddr: Address, orgId: string): void 
 // ============================================
 export function handlePoolCreated(event: PoolEvent): void {
     let poolId = event.params.pool.toHexString()
-    AlgebraPool.create(event.params.pool)
+    // AlgebraPool.create(event.params.pool) // DISABLED: No longer indexing pool events/swaps here
     let pool = new NormalizedPool(poolId)
     pool.baseToken = createTokenInfo(event.params.token0)
     pool.quoteToken = createTokenInfo(event.params.token1)
     pool.isBaseToken0 = true
     pool.currentPrice = BigDecimal.zero()
-    pool.volume24h = BigDecimal.zero()
+    pool.volume24h = BigDecimal.zero() // Will not update
     pool.save()
 }
 
+// ============================================
+// DISABLED: TRADING LOGIC
+// ============================================
+/*
 export function handleSwap(event: Swap): void {
     let poolId = event.address.toHexString()
     let pool = NormalizedPool.load(poolId)
@@ -321,6 +327,7 @@ export function handleSwap(event: Swap): void {
     trade.maker = event.params.sender
     trade.save()
 }
+*/
 
 
 // ============================================
@@ -372,14 +379,21 @@ function findAndLinkPool(factory: AlgebraFactory, tA: Address, tB: Address, base
     if (!call.reverted && call.value != ZERO_ADDRESS) {
         let poolId = call.value.toHexString()
         let pool = NormalizedPool.load(poolId)
-        if (pool) {
-            // Link pool back to proposal for age-based candle tiering
-            pool.proposal = proposalId.toHexString()
-            pool.save()
-            return poolId
+
+        // REGISTRY PATTERN: Create pool on-demand if missing
+        if (!pool) {
+            pool = new NormalizedPool(poolId)
+            pool.baseToken = createTokenInfo(token0)
+            pool.quoteToken = createTokenInfo(token1)
+            pool.isBaseToken0 = true // Algebra always sorts token0 < token1
+            pool.currentPrice = BigDecimal.zero()
+            pool.volume24h = BigDecimal.zero()
+            log.info("Registry: Created missing pool {}", [poolId])
         }
-        // If pool is returned by factory but NOT indexed yet
-        log.warning("Pool found in factory but missing in Subgraph: {}", [poolId])
+
+        // Link pool back to proposal
+        pool.proposal = proposalId.toHexString()
+        pool.save()
         return poolId
     } else {
         log.info("Pool lookup failed for pair: {} - {}", [tA.toHexString(), tB.toHexString()])
@@ -452,6 +466,7 @@ function invert(price: BigDecimal): BigDecimal {
     return BigDecimal.fromString("1").div(price)
 }
 
+/*
 function updateCandles(pool: NormalizedPool, timestamp: BigInt, price: BigDecimal, amount0: BigInt, amount1: BigInt): void {
     // Calculate proposal age for tiered candle creation
     let proposalAge: i32 = 0
@@ -471,7 +486,9 @@ function updateCandles(pool: NormalizedPool, timestamp: BigInt, price: BigDecima
         }
     }
 }
+*/
 
+/*
 function updateCandleForPeriod(pool: NormalizedPool, timestamp: BigInt, price: BigDecimal, amount0: BigInt, amount1: BigInt, period: i32): void {
     let ts = timestamp.toI32()
     let periodStart = (ts / period) * period
@@ -497,3 +514,4 @@ function updateCandleForPeriod(pool: NormalizedPool, timestamp: BigInt, price: B
         candle.save()
     }
 }
+*/

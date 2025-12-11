@@ -77,36 +77,6 @@ type NormalizedPool @entity(immutable: false) {
   # Current State
   currentPrice: BigDecimal!
   volume24h: BigDecimal!
-
-  # Candles
-  candles: [UnifiedCandle!]! @derivedFrom(field: "pool")
-
-  # Recent Trades
-  trades: [UnifiedTrade!]! @derivedFrom(field: "pool")
-}
-
-type UnifiedCandle @entity(immutable: false) {
-  id: ID! # poolId + period
-  pool: NormalizedPool!
-  time: BigInt!
-  period: Int! # e.g. 3600
-  open: BigDecimal!
-  high: BigDecimal!
-  low: BigDecimal!
-  close: BigDecimal!
-  volume: BigDecimal!
-}
-
-type UnifiedTrade @entity(immutable: true) {
-  id: ID!
-  pool: NormalizedPool!
-  timestamp: BigInt!
-  type: String! # BUY or SELL
-  price: BigDecimal!
-  amountBase: BigDecimal!
-  amountQuote: BigDecimal!
-  maker: Bytes!
-  txHash: Bytes!
 }
 
 # Needed for linking logic

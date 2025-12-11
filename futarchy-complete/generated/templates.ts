@@ -6,20 +6,6 @@ import {
   DataSourceContext
 } from "@graphprotocol/graph-ts";
 
-export class AlgebraPool extends DataSourceTemplate {
-  static create(address: Address): void {
-    DataSourceTemplate.create("AlgebraPool", [address.toHex()]);
-  }
-
-  static createWithContext(address: Address, context: DataSourceContext): void {
-    DataSourceTemplate.createWithContext(
-      "AlgebraPool",
-      [address.toHex()],
-      context
-    );
-  }
-}
-
 export class AggregatorTemplate extends DataSourceTemplate {
   static create(address: Address): void {
     DataSourceTemplate.create("AggregatorTemplate", [address.toHex()]);

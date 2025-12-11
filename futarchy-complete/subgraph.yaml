@@ -9,7 +9,7 @@ dataSources:
     source:
       address: "0xa6cB18FCDC17a2B44E5cAd2d80a6D5942d30a345"
       abi: FutarchyFactory
-      startBlock: 40600000
+      startBlock: 43512812
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -37,7 +37,7 @@ dataSources:
     source:
       address: "0xA0864cCA6E114013AB0e27cbd5B6f4c8947da766"
       abi: AlgebraFactory
-      startBlock: 40600000
+      startBlock: 43512812
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -65,7 +65,7 @@ dataSources:
     source:
       address: "0x511D18d5567d76bbd20dEaDF4F90CD9f039eEd2D"
       abi: Creator
-      startBlock: 40600000
+      startBlock: 43512812
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -83,27 +83,7 @@ dataSources:
       file: ./src/mapping.ts
 
 templates:
-  # Algebra Pool - For Candles & Swaps
-  - kind: ethereum/contract
-    name: AlgebraPool
-    network: gnosis
-    source:
-      abi: AlgebraPool
-    mapping:
-      kind: ethereum/events
-      apiVersion: 0.0.7
-      language: wasm/assemblyscript
-      entities:
-        - NormalizedPool
-        - UnifiedCandle
-        - UnifiedTrade
-      abis:
-        - name: AlgebraPool
-          file: ./abis/AlgebraPool.json
-      eventHandlers:
-        - event: Swap(indexed address,indexed address,int256,int256,uint160,uint128,int24)
-          handler: handleSwap
-      file: ./src/mapping.ts
+
   
   # Aggregator Hierarchy (To find Proposals)
   - kind: ethereum/contract

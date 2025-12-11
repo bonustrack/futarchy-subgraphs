@@ -118,4 +118,19 @@ export class FutarchyProposal extends ethereum.SmartContract {
       )
     );
   }
+
+  marketName(): string {
+    let result = super.call("marketName", "marketName():(string)", []);
+
+    return result[0].toString();
+  }
+
+  try_marketName(): ethereum.CallResult<string> {
+    let result = super.tryCall("marketName", "marketName():(string)", []);
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toString());
+  }
 }
