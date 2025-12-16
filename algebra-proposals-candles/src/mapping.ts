@@ -1,11 +1,11 @@
 import { BigInt, Address, BigDecimal, log } from "@graphprotocol/graph-ts"
 import { NewProposal } from "../generated/FutarchyFactory/FutarchyFactory"
 import { Pool as PoolCreated } from "../generated/AlgebraFactory/AlgebraFactory"
-import { Swap } from "../generated/templates/AlgebraPool/AlgebraPool"
+import { Swap as SwapEvent } from "../generated/templates/AlgebraPool/AlgebraPool"
 import { AlgebraPool } from "../generated/templates"
 import { FutarchyProposal } from "../generated/FutarchyFactory/FutarchyProposal"
 import { ERC20 } from "../generated/FutarchyFactory/ERC20"
-import { WhitelistedToken, Pool, Candle, Proposal } from "../generated/schema"
+import { WhitelistedToken, Pool, Candle, Proposal, Swap } from "../generated/schema"
 
 // Constants
 // Constants
@@ -193,23 +193,80 @@ export function handlePoolCreated(event: PoolCreated): void {
 
 const CANDLE_PERIODS: i32[] = [60, 300, 900, 3600, 14400, 86400]
 
-export function handleSwap(event: Swap): void {
+export function handleSwap(event: SwapEvent): void {
     let poolId = event.address.toHexString()
     let pool = Pool.load(poolId)
     if (!pool) return
 
     let timestamp = event.block.timestamp
-    let price = convertSqrtPriceX96(event.params.price)
+    // Calculate accurate price (Raw)
+    let priceRaw = convertSqrtPriceX96(event.params.price)
 
+    // Invert Price if needed (USER PERSPECTIVE)
+    let priceUser = priceRaw
     if (pool.isInverted) {
-        if (price.gt(BigDecimal.zero())) {
-            price = BigDecimal.fromString("1").div(price)
+        if (priceRaw.gt(BigDecimal.zero())) {
+            priceUser = BigDecimal.fromString("1").div(priceRaw)
         }
     }
 
+    // --- SWAP ENTITY -------------------------------------
+    // Use transaction hash + log index for unique ID
+    let swapId = event.transaction.hash.toHexString() + "-" + event.logIndex.toString()
+    let swap = new Swap(swapId)
+    swap.transactionHash = event.transaction.hash
+    swap.timestamp = timestamp
+    swap.pool = poolId
+    swap.sender = event.params.sender
+    swap.recipient = event.params.recipient
+    swap.origin = event.transaction.from // ACTUAL USER ADDRESS
+
+    // Raw Amounts (Wei -> Decimal handled by Schema?? No, Schema is BigDecimal, Params are BigInt)
+    // Assuming 18 decimals for now. TODO: fetch decimals from token entities
+    let amount0 = event.params.amount0.toBigDecimal().div(BigDecimal.fromString("1000000000000000000"))
+    let amount1 = event.params.amount1.toBigDecimal().div(BigDecimal.fromString("1000000000000000000"))
+
+    swap.amount0 = amount0
+    swap.amount1 = amount1
+    swap.price = priceUser
+
+    // Determine Direction (In/Out)
+    // Algebra/UniV3: Negative = Exact Input (User pay), Positive = Exact Output (User receive)
+    // Actually:
+    // amount > 0: Pool pays user (Output)
+    // amount < 0: User pays pool (Input)
+
+    // We need to verify if Token 0 or Token 1 is Input
+    let tokenInAddr: string
+    let tokenOutAddr: string
+    let amountIn: BigDecimal
+    let amountOut: BigDecimal
+
+    if (amount0.lt(BigDecimal.zero())) {
+        // T0 is Input (User paid T0), T1 is Output (User received T1)
+        tokenInAddr = pool.token0
+        tokenOutAddr = pool.token1
+        amountIn = amount0.times(BigDecimal.fromString("-1"))
+        amountOut = amount1
+    } else {
+        // T1 is Input (User paid T1), T0 is Output (User received T0)
+        tokenInAddr = pool.token1
+        tokenOutAddr = pool.token0
+        amountIn = amount1.times(BigDecimal.fromString("-1"))
+        amountOut = amount0
+    }
+
+    swap.tokenIn = tokenInAddr
+    swap.tokenOut = tokenOutAddr
+    swap.amountIn = amountIn
+    swap.amountOut = amountOut
+
+    swap.save()
+    // -----------------------------------------------------
+
     for (let i = 0; i < CANDLE_PERIODS.length; i++) {
         let period = CANDLE_PERIODS[i]
-        updateCandle(poolId, timestamp, price, event.block.number, period)
+        updateCandle(poolId, timestamp, priceUser, event.block.number, period)
     }
 }
 

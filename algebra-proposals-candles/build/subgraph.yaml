@@ -64,6 +64,7 @@ templates:
       entities:
         - Pool
         - Candle
+        - Swap
       abis:
         - name: AlgebraPool
           file: AlgebraPool\abis\AlgebraPool.json

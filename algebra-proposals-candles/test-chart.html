@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Futarchy Subgraph Visualizer</title>
+    <!-- Lightweight Charts for Candlesticks (Pinned to v3.8.0 for stability) -->
+    <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --text-color: #c9d1d9;
+            --border-color: #30363d;
+            --accent-color: #58a6ff;
+            --success-color: #238636;
+            --danger-color: #da3633;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        header {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"] {
+            background: #161b22;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 8px 12px;
+            border-radius: 6px;
+            width: 350px;
+            font-family: monospace;
+        }
+
+        button {
+            background: #21262d;
+            border: 1px solid var(--border-color);
+            color: var(--accent-color);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background: #30363d;
+        }
+
+        button.active {
+            background: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+
+        .main-content {
+            display: flex;
+            flex: 1;
+            gap: 20px;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .pool-card {
+            background: #161b22;
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .pool-card:hover {
+            border-color: var(--accent-color);
+        }
+
+        .pool-card.active {
+            border-color: var(--accent-color);
+            background: #1c2128;
+        }
+
+        .pool-name {
+            font-weight: bold;
+            color: var(--text-color);
+            margin-bottom: 4px;
+        }
+
+        .pool-type {
+            font-size: 0.8em;
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .type-EXPECTED_VALUE {
+            background: rgba(88, 166, 255, 0.2);
+            color: #58a6ff;
+        }
+
+        .type-PREDICTION {
+            background: rgba(218, 54, 51, 0.2);
+            color: #ff7b72;
+        }
+
+        .type-CONDITIONAL {
+            background: rgba(35, 134, 54, 0.2);
+            color: #3fb950;
+        }
+
+        .chart-container {
+            flex: 1;
+            background: #161b22;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            /* Ensure children don't overflow this container */
+        }
+
+        #chart {
+            height: 400px;
+            /* Fixed height for chart so table gets space */
+            flex: 0 0 400px;
+            width: 100%;
+        }
+
+        .chart-header {
+            padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .timeframes {
+            display: flex;
+            gap: 5px;
+        }
+
+        .timeframe-btn {
+            font-size: 0.8em;
+            padding: 4px 8px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>Futarchy Charts</h1>
+        <div class="controls">
+            <label>Proposal ID:</label>
+            <input type="text" id="proposalId" value="0x3d076d5d12341226527241f8a489d4a8863b73e5" />
+            <button onclick="fetchPools()">Load Pools</button>
+        </div>
+    </header>
+
+    <div class="main-content">
+        <div class="sidebar" id="poolList">
+            <!-- Pools will be injected here -->
+            <div style="padding: 10px; color: #8b949e;">Click "Load Pools" to start...</div>
+        </div>
+
+        <div class="chart-container">
+            <div class="chart-header">
+                <span id="chartTitle">Select a Pool</span>
+                <div class="timeframes">
+                    <button class="timeframe-btn" onclick="toggleRawData()">Show Data</button>
+                    <button class="timeframe-btn" onclick="setPeriod(60, this)">1m</button>
+                    <button class="timeframe-btn" onclick="setPeriod(300, this)">5m</button>
+                    <button class="timeframe-btn" onclick="setPeriod(900, this)">15m</button>
+                    <button class="timeframe-btn active" onclick="setPeriod(3600, this)">1h</button>
+                    <button class="timeframe-btn" onclick="setPeriod(14400, this)">4h</button>
+                    <button class="timeframe-btn" onclick="setPeriod(86400, this)">1d</button>
+                </div>
+            </div>
+            <div id="chart"></div>
+            <div id="rawData"
+                style="display:none; height: 200px; overflow: auto; background: #000; color: #0f0; padding: 10px; font-family: monospace; border-top: 1px solid #30363d;">
+            </div>
+
+            <!-- Trade History -->
+            <div class="swaps-container"
+                style="margin-top: 20px; border-top: 1px solid #30363d; flex: 1; overflow-y: auto; min-height: 200px;">
+                <h3
+                    style="padding: 10px; margin: 0; border-bottom: 1px solid #30363d; font-size: 14px; text-transform: uppercase; color: #8b949e;">
+                    Recent Activity</h3>
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <thead>
+                        <tr style="background: #1c2128; color: #8b949e; text-align: left;">
+                            <th style="padding: 8px;">Time</th>
+                            <th style="padding: 8px;">Tx</th>
+                            <th style="padding: 8px;">User</th>
+                            <th style="padding: 8px;">Action</th>
+                            <th style="padding: 8px; text-align:right;">Paid</th>
+                            <th style="padding: 8px; text-align:right;">Received</th>
+                            <th style="padding: 8px; text-align:right;">Price</th>
+                        </tr>
+                    </thead>
+                    <tbody id="swapTableBody">
+                        <tr>
+                            <td colspan="7" style="padding: 20px; text-align: center; color: #8b949e;">Select a pool to
+                                load
+                                trades</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global Error Handler
+        window.onerror = function (msg, url, line) {
+            alert("Script Error: " + msg + "\nLine: " + line);
+            const errDiv = document.createElement('div');
+            errDiv.style.color = 'red';
+            errDiv.style.padding = '10px';
+            errDiv.innerText = "CRITICAL JS ERROR: " + msg;
+            document.body.prepend(errDiv);
+        };
+
+        function toggleRawData() {
+            const el = document.getElementById('rawData');
+            if (el) {
+                el.style.display = el.style.display === 'none' ? 'block' : 'none';
+            } else {
+                alert("Raw Data element not found!");
+            }
+        }
+
+        // Configuration
+        const SUBGRAPH_URL = "https://api.studio.thegraph.com/query/1719045/algebra-proposal-candles/v0.0.11";
+
+        // State
+        let currentPoolId = null;
+        let currentPeriod = 3600; // Default 1h
+        let chart = null;
+        let candleSeries = null;
+
+        // --- Chart Initialization ---
+        function initChart() {
+            try {
+                const chartElement = document.getElementById('chart');
+                console.log("Initializing chart...", chartElement);
+
+                chart = LightweightCharts.createChart(chartElement, {
+                    layout: {
+                        backgroundColor: '#161b22', // v3.8.0 uses backgroundColor
+                        textColor: '#c9d1d9',
+                    },
+                    grid: {
+                        vertLines: { color: '#30363d' },
+                        horzLines: { color: '#30363d' },
+                    },
+                    timeScale: {
+                        timeVisible: true,
+                        secondsVisible: false,
+                    },
+                });
+
+                console.log("Chart created:", chart);
+
+                candleSeries = chart.addCandlestickSeries({
+                    upColor: '#238636',
+                    downColor: '#da3633',
+                    borderVisible: false,
+                    wickUpColor: '#238636',
+                    wickDownColor: '#da3633',
+                });
+
+                console.log("Series added:", candleSeries);
+
+                window.addEventListener('resize', () => {
+                    chart.resize(chartElement.clientWidth, chartElement.clientHeight);
+                });
+            } catch (e) {
+                console.error("Chart Init Error:", e);
+                alert("Chart Init Error: " + e.message);
+            }
+        }
+
+        // --- Data Fetching ---
+        async function fetchPools() {
+            const proposalId = document.getElementById('proposalId').value;
+            const listContainer = document.getElementById('poolList');
+
+            listContainer.innerHTML = '<div style="padding:10px;">Loading...</div>';
+
+            const query = `
+        {
+          proposal(id: "${proposalId}") {
+            pools {
+              id
+              name
+              type
+              token0 { symbol }
+              token1 { symbol }
+            }
+          }
+        }`;
+
+            try {
+                const res = await fetch(SUBGRAPH_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+                const { data } = await res.json();
+
+                if (!data.proposal) {
+                    listContainer.innerHTML = '<div style="padding:10px; color: #da3633;">Proposal not found</div>';
+                    return;
+                }
+
+                renderPoolList(data.proposal.pools);
+            } catch (err) {
+                console.error(err);
+                listContainer.innerHTML = `<div style="padding:10px; color: #da3633;">Error: ${err.message}</div>`;
+            }
+        }
+
+        function renderPoolList(pools) {
+            const listContainer = document.getElementById('poolList');
+            listContainer.innerHTML = '';
+
+            if (pools.length === 0) {
+                listContainer.innerHTML = '<div style="padding:10px;">No pools found.</div>';
+                return;
+            }
+
+            // Sort pools to put EXPECTED_VALUE first usually
+            pools.sort((a, b) => a.type.localeCompare(b.type));
+
+            pools.forEach(pool => {
+                const card = document.createElement('div');
+                card.className = 'pool-card';
+                card.onclick = () => loadPoolChart(pool);
+
+                card.innerHTML = `
+                <div class="pool-name">${pool.name}</div>
+                <div class="pool-type type-${pool.type}">${pool.type}</div>
+                <div style="font-size: 0.8em; color: #8b949e; margin-top:5px;">${pool.id.substring(0, 10)}...</div>
+            `;
+
+                listContainer.appendChild(card);
+            });
+
+            // Auto-select first
+            if (pools.length > 0) loadPoolChart(pools[0]);
+        }
+
+        async function loadPoolChart(pool) {
+            currentPoolId = pool.id;
+            document.getElementById('chartTitle').innerText = `${pool.name} (${currentPeriod / 60}m)`;
+
+            // Highlight active card
+            document.querySelectorAll('.pool-card').forEach(c => c.classList.remove('active'));
+            // (Simple matching logic could be improved with IDs on elements)
+
+            await fetchCandles();
+            fetchSwaps(currentPoolId);
+        }
+
+        async function fetchCandles() {
+            if (!currentPoolId) return;
+
+            const query = `
+        {
+          candles(
+            first: 1000, 
+            orderBy: time, 
+            orderDirection: asc, 
+            where: { pool: "${currentPoolId}", period: ${currentPeriod} }
+          ) {
+            time
+            open
+            high
+            low
+            close
+          }
+        }`;
+
+            try {
+                const res = await fetch(SUBGRAPH_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+                const { data, errors } = await res.json();
+
+                // Raw Data Dump
+                const rawEl = document.getElementById('rawData');
+                if (errors) {
+                    rawEl.innerText = "Errors:\n" + JSON.stringify(errors, null, 2);
+                } else if (data) {
+                    const count = data.candles ? data.candles.length : 0;
+                    rawEl.innerText = `Found ${count} candles for period ${currentPeriod}\n` + JSON.stringify(data, null, 2);
+                } else {
+                    rawEl.innerText = "No data returned";
+                }
+
+
+                if (data && data.candles) {
+                    let chartData = data.candles.map(c => ({
+                        time: parseInt(c.time),
+                        open: parseFloat(c.open),
+                        high: parseFloat(c.high),
+                        low: parseFloat(c.low),
+                        close: parseFloat(c.close),
+                    }));
+
+                    // LIGHTWEIGHT CHARTS REQUIREMENT: SORTED ASCENDING, UNIQUE TIME
+                    chartData.sort((a, b) => a.time - b.time);
+
+                    // Deduplicate
+                    const uniqueData = [];
+                    const seenTimes = new Set();
+                    for (const item of chartData) {
+                        if (!seenTimes.has(item.time)) {
+                            seenTimes.add(item.time);
+                            uniqueData.push(item);
+                        }
+                    }
+
+                    if (candleSeries) {
+                        candleSeries.setData(uniqueData);
+
+                        // FORCE AUTO-SCALE
+                        chart.timeScale().fitContent();
+                        chart.priceScale('right').applyOptions({
+                            autoScale: true,
+                            scaleMargins: {
+                                top: 0.1,
+                                bottom: 0.1,
+                            },
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                document.getElementById('rawData').innerText = "Fetch Error:\n" + err.message;
+            }
+        }
+
+        function setPeriod(seconds, btn) {
+            currentPeriod = seconds;
+
+            // Update Buttons
+            document.querySelectorAll('.timeframe-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            if (currentPoolId) {
+                // Update Title
+                const name = document.getElementById('chartTitle').innerText.split('(')[0].trim();
+                const min = seconds >= 3600 ? (seconds / 3600 + 'h') : (seconds / 60 + 'm');
+                document.getElementById('chartTitle').innerText = `${name} (${min})`;
+
+                fetchCandles();
+            }
+        }
+
+        // Helper: Initial Load
+        initChart();
+        // setTimeout(fetchPools, 500); // Auto-load on open
+
+        // --- Swaps Logic ---
+        async function fetchSwaps(poolId) {
+            const tableBody = document.getElementById('swapTableBody');
+            if (!tableBody) return;
+
+            tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">Loading trades...</td></tr>';
+
+            const query = `
+            {
+              swaps(
+                first: 20, 
+                orderBy: timestamp, 
+                orderDirection: desc, 
+                where: { pool: "${poolId}" }
+              ) {
+                timestamp
+                transactionHash
+                origin
+                pool { type }
+                tokenIn { symbol }
+                tokenOut { symbol }
+                amountIn
+                amountOut
+                price
+              }
+            }`;
+
+            try {
+                const res = await fetch(SUBGRAPH_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+                const { data } = await res.json();
+
+                renderSwaps(data.swaps || []);
+
+            } catch (err) {
+                console.error("Swap Fetch Error:", err);
+                tableBody.innerHTML = `<tr><td colspan="7" style="color:red; padding: 20px;">Error loading trades: ${err.message}</td></tr>`;
+            }
+        }
+
+        function formatSmart(val) {
+            let num = parseFloat(val);
+            if (num === 0) return "0";
+            if (num < 0.0001) {
+                return num.toFixed(8).replace(/\.?0+$/, "");
+            }
+            return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+        }
+
+        function renderSwaps(swaps) {
+            const tableBody = document.getElementById('swapTableBody');
+            tableBody.innerHTML = '';
+
+            if (swaps.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px; color: #8b949e;">No trades found.</td></tr>';
+                return;
+            }
+
+            swaps.forEach(s => {
+                const tr = document.createElement('tr');
+
+                // Format Time
+                const date = new Date(parseInt(s.timestamp) * 1000);
+                const timeStr = date.toLocaleTimeString();
+
+                // Format Address & Tx
+                const userShort = s.origin.substring(0, 6) + "...";
+                const txShort = s.transactionHash ? s.transactionHash.substring(0, 8) + "..." : "Tx";
+                const txLink = s.transactionHash ? `https://gnosisscan.io/tx/${s.transactionHash}` : "#";
+
+                // Pool Type Logic
+                const isPrediction = s.pool.type === 'PREDICTION';
+                const typeBadge = `<span class="pool-type type-${s.pool.type}" style="font-size: 0.7em; margin-top: 4px;">${s.pool.type}</span>`;
+
+                // Format Price (Percentage if Prediction)
+                let priceDisplay;
+                if (isPrediction) {
+                    priceDisplay = (parseFloat(s.price) * 100).toFixed(1) + "%";
+                } else {
+                    priceDisplay = formatSmart(s.price);
+                }
+
+                // Format Raw Amounts
+                const amtIn = formatSmart(s.amountIn);
+                const amtOut = formatSmart(s.amountOut);
+
+                tr.style.whiteSpace = "nowrap";
+                tr.innerHTML = `
+                    <td style="padding: 8px;">${timeStr}</td>
+                    <td style="padding: 8px;"><a href="${txLink}" target="_blank" style="color: #58a6ff; text-decoration: none;">${txShort}</a></td>
+                    <td style="padding: 8px;" title="${s.origin}">${userShort}</td>
+                    <td style="padding: 8px;">
+                        <span style="color: #da3633;">Sell ${s.tokenIn.symbol}</span><br>
+                        <span style="color: #238636;">Buy ${s.tokenOut.symbol}</span><br>
+                        ${typeBadge}
+                    </td>
+                    <td style="padding: 8px; text-align:right;">${amtIn} <span style="color:#8b949e; font-size:0.8em">${s.tokenIn.symbol}</span></td>
+                    <td style="padding: 8px; text-align:right;">${amtOut} <span style="color:#8b949e; font-size:0.8em">${s.tokenOut.symbol}</span></td>
+                    <td style="padding: 8px; text-align:right; color: #e6edf3; font-weight: bold;">${priceDisplay}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+    </script>
+
+</body>
+
+</html>
