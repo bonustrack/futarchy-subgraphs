@@ -83,6 +83,67 @@ export class WhitelistedToken extends Entity {
   set role(value: string) {
     this.set("role", Value.fromString(value));
   }
+
+  get proposal(): Bytes | null {
+    let value = this.get("proposal");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toBytes();
+    }
+  }
+
+  set proposal(value: Bytes | null) {
+    if (!value) {
+      this.unset("proposal");
+    } else {
+      this.set("proposal", Value.fromBytes(<Bytes>value));
+    }
+  }
+}
+
+export class Proposal extends Entity {
+  constructor(id: string) {
+    super();
+    this.set("id", Value.fromString(id));
+  }
+
+  save(): void {
+    let id = this.get("id");
+    assert(id != null, "Cannot save Proposal entity without an ID");
+    if (id) {
+      assert(
+        id.kind == ValueKind.STRING,
+        `Entities of type Proposal must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`,
+      );
+      store.set("Proposal", id.toString(), this);
+    }
+  }
+
+  static loadInBlock(id: string): Proposal | null {
+    return changetype<Proposal | null>(store.get_in_block("Proposal", id));
+  }
+
+  static load(id: string): Proposal | null {
+    return changetype<Proposal | null>(store.get("Proposal", id));
+  }
+
+  get id(): string {
+    let value = this.get("id");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toString();
+    }
+  }
+
+  set id(value: string) {
+    this.set("id", Value.fromString(value));
+  }
+
+  get pools(): PoolLoader {
+    return new PoolLoader("Proposal", this.get("id")!.toString(), "pools");
+  }
 }
 
 export class Pool extends Entity {
@@ -124,30 +185,30 @@ export class Pool extends Entity {
     this.set("id", Value.fromString(value));
   }
 
-  get token0(): Bytes {
+  get token0(): string {
     let value = this.get("token0");
     if (!value || value.kind == ValueKind.NULL) {
       throw new Error("Cannot return null for a required field.");
     } else {
-      return value.toBytes();
+      return value.toString();
     }
   }
 
-  set token0(value: Bytes) {
-    this.set("token0", Value.fromBytes(value));
+  set token0(value: string) {
+    this.set("token0", Value.fromString(value));
   }
 
-  get token1(): Bytes {
+  get token1(): string {
     let value = this.get("token1");
     if (!value || value.kind == ValueKind.NULL) {
       throw new Error("Cannot return null for a required field.");
     } else {
-      return value.toBytes();
+      return value.toString();
     }
   }
 
-  set token1(value: Bytes) {
-    this.set("token1", Value.fromBytes(value));
+  set token1(value: string) {
+    this.set("token1", Value.fromString(value));
   }
 
   get fee(): BigInt {
@@ -218,6 +279,23 @@ export class Pool extends Entity {
   get candles(): CandleLoader {
     return new CandleLoader("Pool", this.get("id")!.toString(), "candles");
   }
+
+  get proposal(): string | null {
+    let value = this.get("proposal");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toString();
+    }
+  }
+
+  set proposal(value: string | null) {
+    if (!value) {
+      this.unset("proposal");
+    } else {
+      this.set("proposal", Value.fromString(<string>value));
+    }
+  }
 }
 
 export class Candle extends Entity {
@@ -270,6 +348,19 @@ export class Candle extends Entity {
 
   set time(value: BigInt) {
     this.set("time", Value.fromBigInt(value));
+  }
+
+  get period(): BigInt {
+    let value = this.get("period");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set period(value: BigInt) {
+    this.set("period", Value.fromBigInt(value));
   }
 
   get periodStartUnix(): BigInt {
@@ -400,6 +491,24 @@ export class Candle extends Entity {
 
   set volumeUSD(value: BigDecimal) {
     this.set("volumeUSD", Value.fromBigDecimal(value));
+  }
+}
+
+export class PoolLoader extends Entity {
+  _entity: string;
+  _field: string;
+  _id: string;
+
+  constructor(entity: string, id: string, field: string) {
+    super();
+    this._entity = entity;
+    this._id = id;
+    this._field = field;
+  }
+
+  load(): Pool[] {
+    let value = store.loadRelated(this._entity, this._id, this._field);
+    return changetype<Pool[]>(value);
   }
 }
 

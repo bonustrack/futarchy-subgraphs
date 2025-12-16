@@ -9,13 +9,14 @@ dataSources:
     source:
       address: "0xa6cB18FCDC17a2B44E5cAd2d80a6D5942d30a345"
       abi: FutarchyFactory
-      startBlock: 43512812
+      startBlock: 43598130
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
       language: wasm/assemblyscript
       entities:
         - WhitelistedToken
+        - Proposal
       abis:
         - name: FutarchyFactory
           file: ./abis/FutarchyFactory.json
@@ -35,7 +36,7 @@ dataSources:
     source:
       address: "0xa0864cca6e114013ab0e27cbd5b6f4c8947da766"
       abi: AlgebraFactory
-      startBlock: 43512812
+      startBlock: 43598130
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7

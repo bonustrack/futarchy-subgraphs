@@ -2,12 +2,18 @@ type WhitelistedToken @entity {
   id: ID! # Token Address
   symbol: String
   role: String! # "BASE" or "QUOTE"
+  proposal: Bytes # Address of the proposal that created this token
+}
+
+type Proposal @entity {
+  id: ID! # Proposal Address
+  pools: [Pool!]! @derivedFrom(field: "proposal")
 }
 
 type Pool @entity {
   id: ID!
-  token0: Bytes!
-  token1: Bytes!
+  token0: WhitelistedToken!
+  token1: WhitelistedToken!
   fee: BigInt!
   liquidity: BigInt!
   sqrtPrice: BigInt!
@@ -15,13 +21,16 @@ type Pool @entity {
   
   # Normalization Flags
   isInverted: Boolean!
-
+  
+  # Relations
   candles: [Candle!]! @derivedFrom(field: "pool")
+  proposal: Proposal # The proposal this pool belongs to
 }
 
 type Candle @entity {
   id: ID!
   time: BigInt!
+  period: BigInt!
   periodStartUnix: BigInt!
   pool: Pool!
   block: BigInt!
