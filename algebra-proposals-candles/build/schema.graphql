@@ -7,6 +7,7 @@ type WhitelistedToken @entity {
 
 type Proposal @entity {
   id: ID! # Proposal Address
+  marketName: String # Fetched from contract
   pools: [Pool!]! @derivedFrom(field: "proposal")
 }
 

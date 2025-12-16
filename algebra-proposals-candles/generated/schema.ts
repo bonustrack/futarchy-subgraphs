@@ -141,6 +141,23 @@ export class Proposal extends Entity {
     this.set("id", Value.fromString(value));
   }
 
+  get marketName(): string | null {
+    let value = this.get("marketName");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toString();
+    }
+  }
+
+  set marketName(value: string | null) {
+    if (!value) {
+      this.unset("marketName");
+    } else {
+      this.set("marketName", Value.fromString(<string>value));
+    }
+  }
+
   get pools(): PoolLoader {
     return new PoolLoader("Proposal", this.get("id")!.toString(), "pools");
   }

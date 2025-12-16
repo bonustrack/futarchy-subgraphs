@@ -9,7 +9,7 @@ dataSources:
     source:
       address: "0xa6cB18FCDC17a2B44E5cAd2d80a6D5942d30a345"
       abi: FutarchyFactory
-      startBlock: 43598130
+      startBlock: 40620030
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -36,7 +36,7 @@ dataSources:
     source:
       address: "0xa0864cca6e114013ab0e27cbd5b6f4c8947da766"
       abi: AlgebraFactory
-      startBlock: 43598130
+      startBlock: 40620030
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -75,4 +75,8 @@ templates:
       eventHandlers:
         - event: Swap(indexed address,indexed address,int256,int256,uint160,uint128,int24)
           handler: handleSwap
+        - event: Mint(address,indexed address,indexed int24,indexed int24,uint128,uint256,uint256)
+          handler: handleMint
+        - event: Burn(indexed address,indexed int24,indexed int24,uint128,uint256,uint256)
+          handler: handleBurn
       file: ./src/mapping.ts

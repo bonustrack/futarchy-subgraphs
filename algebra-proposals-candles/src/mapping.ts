@@ -1,7 +1,11 @@
 import { BigInt, Address, BigDecimal, log } from "@graphprotocol/graph-ts"
 import { NewProposal } from "../generated/FutarchyFactory/FutarchyFactory"
 import { Pool as PoolCreated } from "../generated/AlgebraFactory/AlgebraFactory"
-import { Swap as SwapEvent } from "../generated/templates/AlgebraPool/AlgebraPool"
+import {
+    Swap as SwapEvent,
+    Mint as MintEvent,
+    Burn as BurnEvent
+} from "../generated/templates/AlgebraPool/AlgebraPool"
 import { AlgebraPool } from "../generated/templates"
 import { FutarchyProposal } from "../generated/FutarchyFactory/FutarchyProposal"
 import { ERC20 } from "../generated/FutarchyFactory/ERC20"
@@ -35,7 +39,7 @@ export function handleNewProposal(event: NewProposal): void {
 
     // Collateral 2 is Currency Token (Quote)
     let collateral2 = proposal.try_collateralToken2()
-    if (!collateral2.reverted) saveToken(collateral2.value, ROLE_COLLATERAL, proposalAddress) // Link collateral to proposal? Maybe not unique.
+    if (!collateral2.reverted) saveToken(collateral2.value, ROLE_COLLATERAL, null) // Shared collateral, do NOT link to proposal
 
     // 2. Register Outcome Tokens
     let roles = [ROLE_YES_COMPANY, ROLE_NO_COMPANY, ROLE_YES_CURRENCY, ROLE_NO_CURRENCY]
@@ -47,6 +51,14 @@ export function handleNewProposal(event: NewProposal): void {
         }
         // 3. Create Proposal Entity
         let p = new Proposal(proposalAddress.toHexString())
+
+        let mName = proposal.try_marketName()
+        if (!mName.reverted) {
+            p.marketName = mName.value
+        } else {
+            p.marketName = "Questions" // Default fallback
+        }
+
         p.save()
     }
 }
@@ -267,6 +279,22 @@ export function handleSwap(event: SwapEvent): void {
     for (let i = 0; i < CANDLE_PERIODS.length; i++) {
         let period = CANDLE_PERIODS[i]
         updateCandle(poolId, timestamp, priceUser, event.block.number, period)
+    }
+}
+
+export function handleMint(event: MintEvent): void {
+    let pool = Pool.load(event.address.toHexString())
+    if (pool) {
+        pool.liquidity = pool.liquidity.plus(event.params.liquidityAmount)
+        pool.save()
+    }
+}
+
+export function handleBurn(event: BurnEvent): void {
+    let pool = Pool.load(event.address.toHexString())
+    if (pool) {
+        pool.liquidity = pool.liquidity.minus(event.params.liquidityAmount)
+        pool.save()
     }
 }
 
