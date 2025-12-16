@@ -9,11 +9,18 @@ import { WhitelistedToken, Pool, Candle, Proposal } from "../generated/schema"
 
 // Constants
 // Constants
+// Constants
 export const ROLE_YES_COMPANY = "YES_COMPANY"
 export const ROLE_NO_COMPANY = "NO_COMPANY"
 export const ROLE_YES_CURRENCY = "YES_CURRENCY"
 export const ROLE_NO_CURRENCY = "NO_CURRENCY"
-export const ROLE_COLLATERAL = "COLLATERAL" // Currency Token (Collat 2)
+export const ROLE_COLLATERAL = "COLLATERAL"
+
+// Pool Types
+export const TYPE_EXPECTED_VALUE = "EXPECTED_VALUE"
+export const TYPE_PREDICTION = "PREDICTION"
+export const TYPE_CONDITIONAL = "CONDITIONAL"
+export const TYPE_UNKNOWN = "UNKNOWN"
 
 
 export function handleNewProposal(event: NewProposal): void {
@@ -111,12 +118,34 @@ export function handlePoolCreated(event: PoolCreated): void {
     if (token0 && token1) {
         let r0 = token0.role
         let r1 = token1.role
+        let s0 = token0.symbol ? token0.symbol! : "?"
+        let s1 = token1.symbol ? token1.symbol! : "?"
+
+        // Initialize defaults
+        pool.type = TYPE_UNKNOWN
+        pool.name = s0 + " / " + s1
 
         // RULE 1: Collateral is always Quote
         if (r0 == ROLE_COLLATERAL && r1 != ROLE_COLLATERAL) {
             pool.isInverted = true // Base/Quote -> Quote is T0 -> Inverted
+
+            // Classification
+            if (r1 == ROLE_YES_COMPANY || r1 == ROLE_NO_COMPANY) {
+                pool.type = TYPE_EXPECTED_VALUE
+            } else if (r1 == ROLE_YES_CURRENCY || r1 == ROLE_NO_CURRENCY) {
+                pool.type = TYPE_PREDICTION
+            }
+            pool.name = s1 + " / " + s0
         } else if (r1 == ROLE_COLLATERAL) {
             pool.isInverted = false // Quote is T1 -> Normal
+
+            // Classification
+            if (r0 == ROLE_YES_COMPANY || r0 == ROLE_NO_COMPANY) {
+                pool.type = TYPE_EXPECTED_VALUE
+            } else if (r0 == ROLE_YES_CURRENCY || r0 == ROLE_NO_CURRENCY) {
+                pool.type = TYPE_PREDICTION
+            }
+            pool.name = s0 + " / " + s1
         }
 
         // RULE 2: Conditional Pools (Company vs Currency Outcome)
@@ -124,10 +153,14 @@ export function handlePoolCreated(event: PoolCreated): void {
         else if ((r0 == ROLE_YES_CURRENCY || r0 == ROLE_NO_CURRENCY) && (r1 == ROLE_YES_COMPANY || r1 == ROLE_NO_COMPANY)) {
             // T0 is Currency Outcome (Quote), T1 is Company Outcome (Base) -> Inverted
             pool.isInverted = true
+            pool.type = TYPE_CONDITIONAL
+            pool.name = s1 + " / " + s0
         }
         else if ((r1 == ROLE_YES_CURRENCY || r1 == ROLE_NO_CURRENCY) && (r0 == ROLE_YES_COMPANY || r0 == ROLE_NO_COMPANY)) {
             // T1 is Currency Outcome (Quote), T0 is Base -> Normal
             pool.isInverted = false
+            pool.type = TYPE_CONDITIONAL
+            pool.name = s0 + " / " + s1
         }
 
     } else if (token0 && !token1) {
