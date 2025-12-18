@@ -71,6 +71,23 @@ export class WhitelistedToken extends Entity {
     }
   }
 
+  get decimals(): BigInt | null {
+    let value = this.get("decimals");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set decimals(value: BigInt | null) {
+    if (!value) {
+      this.unset("decimals");
+    } else {
+      this.set("decimals", Value.fromBigInt(<BigInt>value));
+    }
+  }
+
   get role(): string {
     let value = this.get("role");
     if (!value || value.kind == ValueKind.NULL) {
@@ -267,6 +284,19 @@ export class Pool extends Entity {
     this.set("sqrtPrice", Value.fromBigInt(value));
   }
 
+  get price(): BigDecimal {
+    let value = this.get("price");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toBigDecimal();
+    }
+  }
+
+  set price(value: BigDecimal) {
+    this.set("price", Value.fromBigDecimal(value));
+  }
+
   get tick(): BigInt {
     let value = this.get("tick");
     if (!value || value.kind == ValueKind.NULL) {
@@ -317,6 +347,23 @@ export class Pool extends Entity {
 
   set type(value: string) {
     this.set("type", Value.fromString(value));
+  }
+
+  get outcomeSide(): string | null {
+    let value = this.get("outcomeSide");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toString();
+    }
+  }
+
+  set outcomeSide(value: string | null) {
+    if (!value) {
+      this.unset("outcomeSide");
+    } else {
+      this.set("outcomeSide", Value.fromString(<string>value));
+    }
   }
 
   get candles(): CandleLoader {

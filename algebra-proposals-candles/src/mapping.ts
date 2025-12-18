@@ -83,6 +83,13 @@ function saveToken(address: Address, role: string, proposal: Address | null): vo
             token.symbol = "UNK"
         }
 
+        let dec = contract.try_decimals()
+        if (!dec.reverted) {
+            token.decimals = BigInt.fromI32(dec.value)
+        } else {
+            token.decimals = BigInt.fromI32(18)
+        }
+
         token.save()
         log.info("Whitelisted Token: {} ({}) with Role: {}", [id, token.symbol!, role])
     } else if (token.role != role && (role == ROLE_YES_COMPANY || role == ROLE_NO_COMPANY || role == ROLE_YES_CURRENCY || role == ROLE_NO_CURRENCY)) {
@@ -120,6 +127,8 @@ export function handlePoolCreated(event: PoolCreated): void {
     pool.sqrtPrice = BigInt.fromI32(0)
     pool.tick = BigInt.fromI32(0)
     pool.isInverted = false
+    pool.price = BigDecimal.fromString("0")
+
 
     // NORMALIZATION CHECK
     // Logic:
@@ -189,13 +198,23 @@ export function handlePoolCreated(event: PoolCreated): void {
     }
 
     // LINK POOL TO PROPOSAL
-    // If token0 has a proposal, use it. Else if token1 has it.
     if (token0 && token0.proposal) {
         pool.proposal = token0.proposal!.toHexString()
     } else if (token1 && token1.proposal) {
         pool.proposal = token1.proposal!.toHexString()
     }
 
+    // DETERMINE OUTCOME SIDE (YES/NO) for filtering
+    // If any token involves YES, it's YES side. If NO, it's NO side.
+    if (token0 && token1) {
+        let r0 = token0.role
+        let r1 = token1.role
+        if (r0 == ROLE_YES_COMPANY || r0 == ROLE_YES_CURRENCY || r1 == ROLE_YES_COMPANY || r1 == ROLE_YES_CURRENCY) {
+            pool.outcomeSide = "YES"
+        } else if (r0 == ROLE_NO_COMPANY || r0 == ROLE_NO_CURRENCY || r1 == ROLE_NO_COMPANY || r1 == ROLE_NO_CURRENCY) {
+            pool.outcomeSide = "NO"
+        }
+    }
     pool.save()
 
     // Start Indexing
@@ -210,17 +229,48 @@ export function handleSwap(event: SwapEvent): void {
     let pool = Pool.load(poolId)
     if (!pool) return
 
+    // LOAD TOKENS FOR DECIMALS
+    let t0 = WhitelistedToken.load(pool.token0)
+    let t1 = WhitelistedToken.load(pool.token1)
+    let d0 = BigInt.fromI32(18)
+    if (t0 && t0.decimals) {
+        d0 = t0.decimals!
+    }
+
+    let d1 = BigInt.fromI32(18)
+    if (t1 && t1.decimals) {
+        d1 = t1.decimals!
+    }
+
+    // Convert BigInt decimals to exponents
+    // 10^d0 and 10^d1
+    let pow0 = BigInt.fromI32(10).pow(d0.toI32() as u8).toBigDecimal()
+    let pow1 = BigInt.fromI32(10).pow(d1.toI32() as u8).toBigDecimal()
+
     let timestamp = event.block.timestamp
-    // Calculate accurate price (Raw)
+
+    // --- PRICE CALCULATION ---
+    // 1. Raw price from SqrtPriceX96 (Token1 per Token0, disregarding decimals)
     let priceRaw = convertSqrtPriceX96(event.params.price)
 
-    // Invert Price if needed (USER PERSPECTIVE)
-    let priceUser = priceRaw
+    // 2. Adjust for Decimals: Price = priceRaw * (10^d0 / 10^d1)
+    // Corresponds to: (Amount1 / 10^d1) / (Amount0 / 10^d0) = (Amount1/Amount0) * (10^d0/10^d1)
+    let decimalAdjust = pow0.div(pow1)
+    let priceAdjusted = priceRaw.times(decimalAdjust)
+
+    // 3. User Perspective (Inversion)
+    let priceUser = priceAdjusted
     if (pool.isInverted) {
-        if (priceRaw.gt(BigDecimal.zero())) {
-            priceUser = BigDecimal.fromString("1").div(priceRaw)
+        if (priceAdjusted.gt(BigDecimal.zero())) {
+            priceUser = BigDecimal.fromString("1").div(priceAdjusted)
         }
     }
+
+    // UPDATE POOL LATEST PRICE
+    pool.sqrtPrice = event.params.price
+    pool.price = priceUser
+    pool.save()
+
 
     // --- SWAP ENTITY -------------------------------------
     // Use transaction hash + log index for unique ID
@@ -233,10 +283,9 @@ export function handleSwap(event: SwapEvent): void {
     swap.recipient = event.params.recipient
     swap.origin = event.transaction.from // ACTUAL USER ADDRESS
 
-    // Raw Amounts (Wei -> Decimal handled by Schema?? No, Schema is BigDecimal, Params are BigInt)
-    // Assuming 18 decimals for now. TODO: fetch decimals from token entities
-    let amount0 = event.params.amount0.toBigDecimal().div(BigDecimal.fromString("1000000000000000000"))
-    let amount1 = event.params.amount1.toBigDecimal().div(BigDecimal.fromString("1000000000000000000"))
+    // Raw Amounts (Wei -> Decimal)
+    let amount0 = event.params.amount0.toBigDecimal().div(pow0)
+    let amount1 = event.params.amount1.toBigDecimal().div(pow1)
 
     swap.amount0 = amount0
     swap.amount1 = amount1

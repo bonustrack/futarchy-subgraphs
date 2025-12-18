@@ -1,6 +1,7 @@
 type WhitelistedToken @entity {
   id: ID! # Token Address
   symbol: String
+  decimals: BigInt # Decimals fetched from contract
   role: String! # "BASE" or "QUOTE"
   proposal: Bytes # Address of the proposal that created this token
 }
@@ -18,6 +19,7 @@ type Pool @entity {
   fee: BigInt!
   liquidity: BigInt!
   sqrtPrice: BigInt!
+  price: BigDecimal! # Formatted, decimal-adjusted, inverted if needed
   tick: BigInt!
   
   # Normalization Flags
@@ -26,6 +28,8 @@ type Pool @entity {
   # Metadata
   name: String!
   type: String! # "STANDARD", "CONDITIONAL", "PREDICTION"
+  outcomeSide: String # "YES", "NO"
+
 
   # Relations
   candles: [Candle!]! @derivedFrom(field: "pool")
