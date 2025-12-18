@@ -3,13 +3,19 @@ type WhitelistedToken @entity {
   symbol: String
   decimals: BigInt # Decimals fetched from contract
   role: String! # "BASE" or "QUOTE"
-  proposal: Bytes # Address of the proposal that created this token
+  proposal: Proposal # Address of the proposal that created this token
 }
 
 type Proposal @entity {
   id: ID! # Proposal Address
   marketName: String # Fetched from contract
+  
+  # Underlying Tokens
+  companyToken: WhitelistedToken
+  currencyToken: WhitelistedToken
+
   pools: [Pool!]! @derivedFrom(field: "proposal")
+  outcomeTokens: [WhitelistedToken!]! @derivedFrom(field: "proposal")
 }
 
 type Pool @entity {

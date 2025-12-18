@@ -34,12 +34,21 @@ export function handleNewProposal(event: NewProposal): void {
     // 1. Register Collaterals
     // Collateral 1 is usually Company Token - we might treat it generic or specific if needed. 
     // For now, let's just log it but the pools usually pair against Collat 2.
-    // let collateral1 = proposal.try_collateralToken1()
-    // if (!collateral1.reverted) saveToken(collateral1.value, "COLLATERAL_1")
+    // Collateral 1 is Company Token
+    let collateral1 = proposal.try_collateralToken1()
+    let companyTokenHex: string | null = null
+    if (!collateral1.reverted) {
+        saveToken(collateral1.value, "COMPANY", null)
+        companyTokenHex = collateral1.value.toHexString()
+    }
 
     // Collateral 2 is Currency Token (Quote)
     let collateral2 = proposal.try_collateralToken2()
-    if (!collateral2.reverted) saveToken(collateral2.value, ROLE_COLLATERAL, null) // Shared collateral, do NOT link to proposal
+    let currencyTokenHex: string | null = null
+    if (!collateral2.reverted) {
+        saveToken(collateral2.value, ROLE_COLLATERAL, null)
+        currencyTokenHex = collateral2.value.toHexString()
+    }
 
     // 2. Register Outcome Tokens
     let roles = [ROLE_YES_COMPANY, ROLE_NO_COMPANY, ROLE_YES_CURRENCY, ROLE_NO_CURRENCY]
@@ -59,6 +68,10 @@ export function handleNewProposal(event: NewProposal): void {
             p.marketName = "Questions" // Default fallback
         }
 
+        // Save Token Links
+        if (companyTokenHex) p.companyToken = companyTokenHex!
+        if (currencyTokenHex) p.currencyToken = currencyTokenHex!
+
         p.save()
     }
 }
@@ -71,7 +84,7 @@ function saveToken(address: Address, role: string, proposal: Address | null): vo
     if (!token) {
         token = new WhitelistedToken(id)
         token.role = role
-        if (proposal) token.proposal = proposal
+        if (proposal) token.proposal = proposal.toHexString()
 
         // Attempt to fetch symbol, but don't break if fail
         // Using ERC20 binding from generic ABI if present or generic ERC20 interaction
@@ -97,7 +110,7 @@ function saveToken(address: Address, role: string, proposal: Address | null): vo
         token.role = role
         // Also update proposal if missing? Maybe better not to overwrite if it exists (collision?)
         // Assuming Outcomes are unique, Collaterals are shared.
-        if (proposal && !token.proposal) token.proposal = proposal
+        if (proposal && !token.proposal) token.proposal = proposal.toHexString()
         token.save()
     }
 }
@@ -199,9 +212,9 @@ export function handlePoolCreated(event: PoolCreated): void {
 
     // LINK POOL TO PROPOSAL
     if (token0 && token0.proposal) {
-        pool.proposal = token0.proposal!.toHexString()
+        pool.proposal = token0.proposal!
     } else if (token1 && token1.proposal) {
-        pool.proposal = token1.proposal!.toHexString()
+        pool.proposal = token1.proposal!
     }
 
     // DETERMINE OUTCOME SIDE (YES/NO) for filtering

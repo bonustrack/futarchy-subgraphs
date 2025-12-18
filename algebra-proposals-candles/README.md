@@ -1,72 +1,38 @@
-# Algebra Candles Subgraph
+# Algebra Proposals Subgraph 📊
 
-This subgraph tracks OHLC (Open, High, Low, Close) candles and the latest price for an Algebra V3 pool on Gnosis Chain.
+A The Graph subgraph for indexing Futarchy Algebra pools, proposals, candles, and swaps.
 
-## Pool Details
-- **Network**: Gnosis Chain
-- **Address**: `0x462BB6bB0261B2159b0e3cc763a1499e29afc1F8`
-- **Start Block**: 43468000
+**Live Endpoint (v0.0.24):**
+`https://api.studio.thegraph.com/query/1719045/algebra-proposal-candles/v0.0.24`
 
-## Entities
-1. **Pool**: Tracks live state (`lastPrice`, `tick`, `timestamp`).
-2. **Candle**: Tracks hourly OHLC data.
+## Features
+*   **Proposals**: Groups pools by their governance proposal or market question.
+*   **Spot Price**: Real-time `pool.price` calculated server-side (handling decimals & inversion).
+*   **Outcome Classification**: `outcomeSide` ("YES"/"NO") for easy UI filtering.
+*   **Candles**: OHLCV data for multiple timeframes (1m, 5m, 15m, 1h, 4h, 1d).
+*   **Swaps**: Full trade history with human-readable amounts.
 
-## Setup & Deployment
+## Documentation
+For detailed frontend integration instructions, copy-paste queries, and data models, see:
+👉 **[subgraph_integration_guide.md](./subgraph_integration_guide.md)**
 
-### 1. Install Dependencies
-```bash
-npm install
-```
+## Quick Start (Query)
 
-### 2. Generate Types
-```bash
-npm run codegen
-```
-
-### 3. Build
-```bash
-npm run build
-```
-
-### 4. Deploy to Subgraph Studio
-1. Go to [The Graph Studio](https://thegraph.com/studio/) and create a subgraph named `algebra-candles`.
-2. Authenticate:
-   ```bash
-   graph auth --studio <YOUR_DEPLOY_KEY>
-   ```
-3. Deploy:
-   ```bash
-   npm run deploy
-   ```
-
-## Query Examples
-
-### Get Live Price & Last Update
 ```graphql
 {
-  pool(id: "0x462bb6bb0261b2159b0e3cc763a1499e29afc1F8") {
-    lastPrice
-    tick
-    timestamp
+  proposals(first: 5) {
+    id
+    marketName
+    pools {
+      type
+      outcomeSide # "YES" or "NO"
+      price       # Live Spot Price
+    }
   }
 }
 ```
 
-### Get Historical Candles
-```graphql
-{
-  candles(
-    where: { pool: "0x462bb6bb0261b2159b0e3cc763a1499e29afc1F8" }
-    orderBy: periodStartUnix
-    orderDirection: desc
-    first: 24
-  ) {
-    periodStartUnix
-    open
-    high
-    low
-    close
-    volumeToken0
-  }
-}
-```
+## Development
+1.  **Install dependencies:** `npm install`
+2.  **Generate types:** `npm run codegen`
+3.  **Deploy:** `npx graph deploy --studio algebra-proposal-candles --version-label v0.0.24`
