@@ -3,20 +3,19 @@ const SUBGRAPH_URL = "https://api.studio.thegraph.com/query/1719045/algebra-prop
 async function run() {
     const query = `
     {
-        proposals(first: 1, orderBy: id, orderDirection: desc) {
+        p1: proposal(id: "0x01a863c7fedd7ca99355a017ea1eda219c4c7c48") {
             id
             marketName
-            companyToken { symbol decimals id }
-            currencyToken { symbol decimals id }
-            outcomeTokens { 
-                symbol 
-                role 
-                decimals 
-            }
+            outcomeTokens { id role }
+        }
+        p2: proposal(id: "0x9590daf4d5cd4009c3f9767c5e7668175cfd37cf") {
+            id
+            marketName
+            outcomeTokens { id role }
         }
     }`;
 
-    console.log("Querying v0.0.25 for latest proposal...");
+    console.log("Querying v0.0.25 to compare proposals...");
 
     try {
         const res = await fetch(SUBGRAPH_URL, {
@@ -32,21 +31,24 @@ async function run() {
             return;
         }
 
-        const p = json.data.proposals[0];
-        if (!p) {
-            console.log("No proposals found yet (Indexing might be in progress).");
-            return;
+        const p1 = json.data.p1;
+        const p2 = json.data.p2;
+
+        console.log("\n=== PROPOSAL COMPARISON ===");
+        if (p1) {
+            console.log(`[Target] ${p1.id} - ${p1.marketName}`);
+            console.log(`Outcomes: ${p1.outcomeTokens.length}`);
+        } else {
+            console.log("[Target] 0x01a8... NOT FOUND");
         }
 
-        console.log("\n=== LATEST PROPOSAL DATA ===");
-        console.log(`Market: ${p.marketName}`);
-        console.log(`Company Token: ${p.companyToken ? p.companyToken.symbol : 'NULL'}`);
-        console.log(`Currency Token: ${p.currencyToken ? p.currencyToken.symbol : 'NULL'}`);
-        console.log(`Outcome Tokens: ${p.outcomeTokens.length}`);
-        p.outcomeTokens.forEach(t => {
-            console.log(` - ${t.role}: ${t.symbol} (${t.decimals})`);
-        });
-        console.log("============================");
+        if (p2) {
+            console.log(`[Conflicting] ${p2.id} - ${p2.marketName}`);
+            console.log(`Outcomes: ${p2.outcomeTokens.length}`);
+        } else {
+            console.log("[Conflicting] 0x9590... NOT FOUND");
+        }
+        console.log("===========================");
 
     } catch (e) {
         console.error("Fetch Error:", e);

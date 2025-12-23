@@ -175,50 +175,47 @@ export class Proposal extends Entity {
     }
   }
 
-  get companyToken(): string | null {
+  get companyToken(): string {
     let value = this.get("companyToken");
     if (!value || value.kind == ValueKind.NULL) {
-      return null;
+      throw new Error("Cannot return null for a required field.");
     } else {
       return value.toString();
     }
   }
 
-  set companyToken(value: string | null) {
-    if (!value) {
-      this.unset("companyToken");
-    } else {
-      this.set("companyToken", Value.fromString(<string>value));
-    }
+  set companyToken(value: string) {
+    this.set("companyToken", Value.fromString(value));
   }
 
-  get currencyToken(): string | null {
+  get currencyToken(): string {
     let value = this.get("currencyToken");
     if (!value || value.kind == ValueKind.NULL) {
-      return null;
+      throw new Error("Cannot return null for a required field.");
     } else {
       return value.toString();
     }
   }
 
-  set currencyToken(value: string | null) {
-    if (!value) {
-      this.unset("currencyToken");
-    } else {
-      this.set("currencyToken", Value.fromString(<string>value));
-    }
+  set currencyToken(value: string) {
+    this.set("currencyToken", Value.fromString(value));
   }
 
   get pools(): PoolLoader {
     return new PoolLoader("Proposal", this.get("id")!.toString(), "pools");
   }
 
-  get outcomeTokens(): WhitelistedTokenLoader {
-    return new WhitelistedTokenLoader(
-      "Proposal",
-      this.get("id")!.toString(),
-      "outcomeTokens",
-    );
+  get outcomeTokens(): Array<string> {
+    let value = this.get("outcomeTokens");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toStringArray();
+    }
+  }
+
+  set outcomeTokens(value: Array<string>) {
+    this.set("outcomeTokens", Value.fromStringArray(value));
   }
 }
 
@@ -850,24 +847,6 @@ export class PoolLoader extends Entity {
   load(): Pool[] {
     let value = store.loadRelated(this._entity, this._id, this._field);
     return changetype<Pool[]>(value);
-  }
-}
-
-export class WhitelistedTokenLoader extends Entity {
-  _entity: string;
-  _field: string;
-  _id: string;
-
-  constructor(entity: string, id: string, field: string) {
-    super();
-    this._entity = entity;
-    this._id = id;
-    this._field = field;
-  }
-
-  load(): WhitelistedToken[] {
-    let value = store.loadRelated(this._entity, this._id, this._field);
-    return changetype<WhitelistedToken[]>(value);
   }
 }
 

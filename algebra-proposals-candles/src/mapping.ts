@@ -52,28 +52,36 @@ export function handleNewProposal(event: NewProposal): void {
 
     // 2. Register Outcome Tokens
     let roles = [ROLE_YES_COMPANY, ROLE_NO_COMPANY, ROLE_YES_CURRENCY, ROLE_NO_CURRENCY]
+    let outcomeTokenIds: string[] = []
+
     for (let i = 0; i < 4; i++) {
         let res = proposal.try_wrappedOutcome(BigInt.fromI32(i))
         if (!res.reverted) {
+            // Get the address (this is the token itself)
             let tokenAddress = res.value.getWrapped1155()
             saveToken(tokenAddress, roles[i], proposalAddress)
+            outcomeTokenIds.push(tokenAddress.toHexString())
         }
-        // 3. Create Proposal Entity
-        let p = new Proposal(proposalAddress.toHexString())
-
-        let mName = proposal.try_marketName()
-        if (!mName.reverted) {
-            p.marketName = mName.value
-        } else {
-            p.marketName = "Questions" // Default fallback
-        }
-
-        // Save Token Links
-        if (companyTokenHex) p.companyToken = companyTokenHex!
-        if (currencyTokenHex) p.currencyToken = currencyTokenHex!
-
-        p.save()
     }
+
+    // 3. Create Proposal Entity
+    let p = new Proposal(proposalAddress.toHexString())
+
+    let mName = proposal.try_marketName()
+    if (!mName.reverted) {
+        p.marketName = mName.value
+    } else {
+        p.marketName = "Questions" // Default fallback
+    }
+
+    // Save Token Links
+    if (companyTokenHex) p.companyToken = companyTokenHex!
+    if (currencyTokenHex) p.currencyToken = currencyTokenHex!
+
+    // Save Outcomes Array (Many-to-Many support)
+    p.outcomeTokens = outcomeTokenIds
+
+    p.save()
 }
 
 
@@ -110,7 +118,7 @@ function saveToken(address: Address, role: string, proposal: Address | null): vo
         token.role = role
         // Also update proposal if missing? Maybe better not to overwrite if it exists (collision?)
         // Assuming Outcomes are unique, Collaterals are shared.
-        if (proposal && !token.proposal) token.proposal = proposal.toHexString()
+        if (proposal) token.proposal = proposal.toHexString()
         token.save()
     }
 }

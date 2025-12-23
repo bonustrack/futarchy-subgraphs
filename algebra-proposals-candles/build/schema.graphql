@@ -11,11 +11,13 @@ type Proposal @entity {
   marketName: String # Fetched from contract
   
   # Underlying Tokens
-  companyToken: WhitelistedToken
-  currencyToken: WhitelistedToken
+  companyToken: WhitelistedToken!
+  currencyToken: WhitelistedToken!
 
   pools: [Pool!]! @derivedFrom(field: "proposal")
-  outcomeTokens: [WhitelistedToken!]! @derivedFrom(field: "proposal")
+  
+  # Stored array allows Many-to-Many (One token can be in multiple proposals)
+  outcomeTokens: [WhitelistedToken!]!
 }
 
 type Pool @entity {
