@@ -1,0 +1,47 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: FAOSale
+    network: gnosis
+    source:
+      address: "0x460915528ce37ec66a26b98b791db512bc62dc17"
+      abi: FAOSale
+      startBlock: 43382150
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Sale
+        - PurchaseEvent
+        - RagequitEvent
+        - LifecycleEvent
+        - ConfigChange
+        - RagequitToken
+        - RoleGrant
+        - RoleRevoke
+      abis:
+        - name: FAOSale
+          file: ./abis/FAOSale.json
+      eventHandlers:
+        - event: Purchase(indexed address,uint256,uint256)
+          handler: handlePurchase
+        - event: Ragequit(indexed address,uint256,uint256)
+          handler: handleRagequit
+        - event: SaleStarted(uint256,uint256)
+          handler: handleSaleStarted
+        - event: IncentiveContractSet(indexed address)
+          handler: handleIncentiveSet
+        - event: InsiderVestingContractSet(indexed address)
+          handler: handleInsiderSet
+        - event: RagequitTokenAdded(indexed address)
+          handler: handleRagequitTokenAdded
+        - event: RagequitTokenRemoved(indexed address)
+          handler: handleRagequitTokenRemoved
+        - event: RoleGranted(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleGranted
+        - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleRevoked
+      file: ./src/mapping.ts
