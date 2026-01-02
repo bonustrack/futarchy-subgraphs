@@ -3,6 +3,8 @@ import { NewProposal } from "../generated/FutarchyFactory/FutarchyFactory"
 import { Pool as PoolEvent, AlgebraFactory } from "../generated/AlgebraFactory/AlgebraFactory"
 import { FutarchyProposal } from "../generated/FutarchyFactory/FutarchyProposal"
 import { AggregatorMetadataCreated } from "../generated/Creator/Creator"
+import { OrganizationMetadataCreated } from "../generated/OrganizationFactory/OrganizationFactory"
+import { ProposalMetadataCreated } from "../generated/ProposalMetadataFactory/ProposalMetadataFactory"
 import { OrganizationAdded, AggregatorInfoUpdated, ExtendedMetadataUpdated as AggregatorExtendedMetadataUpdated } from "../generated/templates/AggregatorTemplate/Aggregator"
 import { ProposalAdded, CompanyInfoUpdated, ExtendedMetadataUpdated as OrganizationExtendedMetadataUpdated } from "../generated/templates/OrganizationTemplate/Organization"
 import { MetadataUpdated, Proposal as MetadataContract, ExtendedMetadataUpdated as ProposalExtendedMetadataUpdated } from "../generated/templates/ProposalTemplate/Proposal"
@@ -37,9 +39,6 @@ const CANDLE_PERIODS: i32[] = [60, 600, 3600]
 // Max age (in seconds) for each period: 24 hours, 7 days, 0 = unlimited
 const CANDLE_MAX_AGES: i32[] = [86400, 604800, 0]
 
-// ============================================
-// 1. FUTARCHY PROPOSAL CREATION (Trading Core)
-// ============================================
 // ============================================
 // 1. FUTARCHY PROPOSAL CREATION (Trading Core)
 // ============================================
@@ -88,11 +87,7 @@ export function handleNewProposal(event: NewProposal): void {
 }
 
 // ============================================
-// 2. METADATA & HIERARCHY
-// ============================================
-
-// ============================================
-// 2. METADATA & HIERARCHY
+// 2. METADATA & HIERARCHY - FACTORY HANDLERS (CREATION)
 // ============================================
 
 export function handleAggregatorCreated(event: AggregatorMetadataCreated): void {
@@ -117,18 +112,20 @@ export function handleAggregatorCreated(event: AggregatorMetadataCreated): void 
     entity.save()
 }
 
-export function handleOrganizationAdded(event: OrganizationAdded): void {
-    OrganizationTemplate.create(event.params.organizationMetadata)
+export function handleOrganizationMetadataCreated(event: OrganizationMetadataCreated): void {
+    // 1. Create Template to listen for updates
+    OrganizationTemplate.create(event.params.metadata)
 
-    let orgId = event.params.organizationMetadata.toHexString()
-    let entity = new Organization(orgId)
-    entity.aggregator = event.address.toHexString()
+    let orgId = event.params.metadata.toHexString()
+    let entity = Organization.load(orgId)
+    if (entity == null) {
+        entity = new Organization(orgId)
+    }
+
     entity.createdAt = event.block.timestamp
+    entity.name = event.params.name
 
-    let contract = OrganizationContract.bind(event.params.organizationMetadata)
-    let nCall = contract.try_companyName()
-    entity.name = !nCall.reverted ? nCall.value : "Unknown"
-
+    let contract = OrganizationContract.bind(event.params.metadata)
     let dCall = contract.try_description()
     entity.description = !dCall.reverted ? dCall.value : ""
 
@@ -142,16 +139,60 @@ export function handleOrganizationAdded(event: OrganizationAdded): void {
     entity.metadataURI = !uCall.reverted ? uCall.value : ""
 
     entity.save()
+}
 
-    // BACKFILL: Fetch existing proposals from Organization state (for "Time Travel" / Old Proposals)
+export function handleProposalMetadataCreated(event: ProposalMetadataCreated): void {
+    let metadataAddr = event.params.metadata
+    let tradingProposalAddr = event.params.proposalAddress
+
+    // 1. Create Template to listen for updates
+    ProposalTemplate.create(metadataAddr)
+
+    // 2. Populate Unified Entity
+    populateUnifiedEntityFromMetadata(tradingProposalAddr, metadataAddr)
+}
+
+
+// ============================================
+// 3. METADATA & HIERARCHY - LINKING HANDLERS
+// ============================================
+
+export function handleOrganizationAdded(event: OrganizationAdded): void {
+    let orgId = event.params.organizationMetadata.toHexString()
+    let aggregatorId = event.address.toHexString()
+
+    // Check if Org exists (it should, from Factory)
+    let entity = Organization.load(orgId)
+
+    // Fallback: If for some reason we missed the Factory event, create it now (Robustness)
+    if (entity == null) {
+        OrganizationTemplate.create(event.params.organizationMetadata)
+        entity = new Organization(orgId)
+        entity.createdAt = event.block.timestamp
+        // We can try to fetch details here if we really need to, but ideally Factory handled it.
+        // Let's re-use the factory logic just in case:
+        let contract = OrganizationContract.bind(event.params.organizationMetadata)
+        let nCall = contract.try_companyName()
+        entity.name = !nCall.reverted ? nCall.value : "Unknown"
+        // ... (other fields left as default/null to keep it simple, or duplicate logic if needed)
+    }
+
+    entity.aggregator = aggregatorId
+    entity.save()
+
+    // BACKFILL: Still linking proposals if they exist
+    // Currently relying on factories for primary indexing, but linking is fine.
+    // If proposals were created before org link, they exist but have no org.
+    // We can backfill the LINK here.
+    let contract = OrganizationContract.bind(event.params.organizationMetadata)
     let countCall = contract.try_getProposalsCount()
     if (!countCall.reverted && countCall.value.gt(BigInt.zero())) {
         let count = countCall.value
-        // We use offset 0, limit = count. Be careful with size, but for now safe.
         let propsCall = contract.try_getProposals(BigInt.zero(), count)
         if (!propsCall.reverted) {
             let proposals = propsCall.value
             for (let i = 0; i < proposals.length; i++) {
+                // This function basically looks up mapped entity and sets org
                 linkProposalToOrganization(proposals[i], orgId)
             }
         }
@@ -172,7 +213,7 @@ export function handleProposalMetadataUpdated(event: MetadataUpdated): void {
     entity.displayNameEvent = event.params.displayNameEvent
     entity.description = event.params.description
 
-    // Update title logic: User prefers marketName if available, else Question, else Event
+    // Update title logic
     if (entity.marketName && entity.marketName != "Initializing...") {
         entity.title = entity.marketName
     } else if (entity.displayNameQuestion && entity.displayNameQuestion != "Loading...") {
@@ -217,30 +258,42 @@ export function handleProposalExtendedMetadataUpdated(event: ProposalExtendedMet
 
 
 // ============================================
-// 3. REUSABLE LINKING LOGIC (For Event & Historical Backfill)
+// 4. REUSABLE LINKING & POPULATION LOGIC
 // ============================================
 
 function linkProposalToOrganization(metadataAddr: Address, orgId: string): void {
-    // 1. Create Template to listen for updates
-    ProposalTemplate.create(metadataAddr)
-
-    let metaId = metadataAddr.toHexString()
-
-    // 2. Bind to Metadata Contract to get the Trading Proposal Address
+    // 1. We might not have metadata about which Trading Proposal this is unless we query
     let contract = MetadataContract.bind(metadataAddr)
     let addrCall = contract.try_proposalAddress()
 
     if (addrCall.reverted) {
-        log.warning("LinkProposal: Could not fetch proposalAddress from {}", [metaId])
         return
     }
 
     let tradingProposalId = addrCall.value
-
-    // 3. Create/Update the Unified Entity (Shell or Existing)
     let entity = getOrCreateUnifiedEntity(tradingProposalId)
+
+    // LINK
     entity.organization = orgId
+
+    // Also, ensure template is created and metadata linked (idempotent)
+    ProposalTemplate.create(metadataAddr)
     entity.metadataContract = metadataAddr
+
+    // Re-run population? It's expensive but ensures consistency if ProposalAdded seen before Factory
+    // But duplicate logic... let's trust Factory mostly, or check if "Loading..."
+    if (entity.description == "Loading..." || entity.description == null) {
+        populateUnifiedEntityFromMetadata(tradingProposalId, metadataAddr)
+    }
+
+    entity.save()
+}
+
+function populateUnifiedEntityFromMetadata(tradingProposalId: Address, metadataAddr: Address): void {
+    let entity = getOrCreateUnifiedEntity(tradingProposalId)
+
+    entity.metadataContract = metadataAddr
+    let contract = MetadataContract.bind(metadataAddr)
 
     // 4. Fill Metadata
     let qCall = contract.try_displayNameQuestion()
@@ -265,18 +318,17 @@ function linkProposalToOrganization(metadataAddr: Address, orgId: string): void 
     // 5. REGISTRY: Always fetch Tokens & Pools (Treat Metadata as primary source)
     let tradeContract = FutarchyProposal.bind(tradingProposalId)
 
-    let col1Call = tradeContract.try_collateralToken1()
-    let col2Call = tradeContract.try_collateralToken2()
-
     // FETCH MARKET NAME (Fixes "Initializing..." for backfilled proposals)
     let mNameCall = tradeContract.try_marketName()
     if (!mNameCall.reverted) {
         entity.marketName = mNameCall.value
-        // Update Title priority if currently default
         if (entity.title == "Loading..." || entity.title == "Initializing...") {
             entity.title = mNameCall.value
         }
     }
+
+    let col1Call = tradeContract.try_collateralToken1()
+    let col2Call = tradeContract.try_collateralToken2()
 
     if (!col1Call.reverted && !col2Call.reverted) {
         let c1 = col1Call.value
@@ -297,9 +349,6 @@ function linkProposalToOrganization(metadataAddr: Address, orgId: string): void 
         entity.outcomeYesCurrency = w2.toHexString()
         entity.outcomeNoCurrency = w3.toHexString()
 
-        // Log details for debugging
-        // log.info("Tokens: c1={}, c2={}, w0={}", [c1.toHexString(), c2.toHexString(), w0.toHexString()])
-
         let factory = AlgebraFactory.bind(ALGEBRA_FACTORY_ADDRESS)
 
         entity.poolConditionalYes = findAndLinkPool(factory, w0, w2, true, tradingProposalId)
@@ -309,7 +358,7 @@ function linkProposalToOrganization(metadataAddr: Address, orgId: string): void 
         entity.poolPredictionYes = findAndLinkPool(factory, w2, c2, true, tradingProposalId)
         entity.poolPredictionNo = findAndLinkPool(factory, w3, c2, true, tradingProposalId)
     } else {
-        log.warning("Registry Failed: Could not fetch collateral tokens for prop {}", [tradingProposalId.toHexString()])
+        log.warning("Registry Failed: Could not fetch tokens for prop {}", [tradingProposalId.toHexString()])
     }
 
     entity.save()
@@ -317,79 +366,25 @@ function linkProposalToOrganization(metadataAddr: Address, orgId: string): void 
 
 
 // ============================================
-// 3. POOL & TRADING LOGIC
+// 5. POOL LOGIC & HELPERS
 // ============================================
 export function handlePoolCreated(event: PoolEvent): void {
     let poolId = event.params.pool.toHexString()
-    // AlgebraPool.create(event.params.pool) // DISABLED: No longer indexing pool events/swaps here
     let pool = new NormalizedPool(poolId)
     pool.baseToken = createTokenInfo(event.params.token0)
     pool.quoteToken = createTokenInfo(event.params.token1)
     pool.isBaseToken0 = true
     pool.currentPrice = BigDecimal.zero()
-    pool.volume24h = BigDecimal.zero() // Will not update
+    pool.volume24h = BigDecimal.zero()
     pool.save()
 }
-
-// ============================================
-// DISABLED: TRADING LOGIC
-// ============================================
-/*
-export function handleSwap(event: Swap): void {
-    let poolId = event.address.toHexString()
-    let pool = NormalizedPool.load(poolId)
-    if (!pool) return
-
-    // Only process swaps for pools linked to futarchy proposals
-    if (!pool.proposal) return
-
-    let token0Params = TokenInfo.load(pool.baseToken)
-    let token1Params = TokenInfo.load(pool.quoteToken)
-    let d0 = token0Params ? BigInt.fromString(token0Params.decimals.toString()) : BigInt.fromI32(18)
-    let d1 = token1Params ? BigInt.fromString(token1Params.decimals.toString()) : BigInt.fromI32(18)
-
-    let rawPrice = getPrice(event.params.price, d0, d1)
-    let normalizedPrice = pool.isBaseToken0 ? rawPrice : invert(rawPrice)
-
-    pool.currentPrice = normalizedPrice
-    pool.save()
-
-    updateCandles(pool, event.block.timestamp, normalizedPrice, event.params.amount0, event.params.amount1)
-
-    let tradeId = event.transaction.hash.concatI32(event.logIndex.toI32()).toHexString()
-    let trade = new UnifiedTrade(tradeId)
-    trade.pool = poolId
-    trade.timestamp = event.block.timestamp
-    trade.txHash = event.transaction.hash
-    trade.price = normalizedPrice
-
-    let isBuy = false
-    if (pool.isBaseToken0) {
-        isBuy = event.params.amount0.lt(BigInt.zero())
-        trade.amountBase = event.params.amount0.abs().toBigDecimal()
-        trade.amountQuote = event.params.amount1.abs().toBigDecimal()
-    } else {
-        isBuy = event.params.amount1.lt(BigInt.zero())
-        trade.amountBase = event.params.amount1.abs().toBigDecimal()
-        trade.amountQuote = event.params.amount0.abs().toBigDecimal()
-    }
-    trade.type = isBuy ? "BUY" : "SELL"
-    trade.maker = event.params.sender
-    trade.save()
-}
-*/
-
-
-// ============================================
-// HELPERS
-// ============================================
 
 function getOrCreateUnifiedEntity(proposalId: Bytes): UnifiedOneStopShop {
     let id = proposalId.toHexString()
     let entity = UnifiedOneStopShop.load(id)
     if (entity == null) {
         entity = new UnifiedOneStopShop(id)
-        // Default values to avoid null errors
+        // Default values
         entity.title = "Loading..."
         entity.description = "Loading..."
         entity.marketName = "Initializing..."
@@ -398,13 +393,6 @@ function getOrCreateUnifiedEntity(proposalId: Bytes): UnifiedOneStopShop {
         entity.resolutionDate = BigInt.fromI32(0)
         entity.createdAtTimestamp = BigInt.fromI32(0)
 
-        // Placeholders for tokens (will be filled by NewProposal)
-        entity.companyToken = "UNKNOWN"
-        entity.currencyToken = "UNKNOWN"
-
-        // Ensure dummy known tokens exist to satisfy non-nullable schema? 
-        // Schema says TokenInfo! so we need valid IDs.
-        // We use a predefined "UNKNOWN" ID.
         let unknown = createTokenInfo(ZERO_ADDRESS)
         entity.companyToken = unknown
         entity.currencyToken = unknown
@@ -417,7 +405,7 @@ function getOrCreateUnifiedEntity(proposalId: Bytes): UnifiedOneStopShop {
 function findAndLinkPool(factory: AlgebraFactory, tA: Address, tB: Address, baseIsA: boolean, proposalId: Bytes): string | null {
     if (tA == ZERO_ADDRESS || tB == ZERO_ADDRESS) return null
 
-    // Sort tokens for Algebra lookup (just in case)
+    // Sort tokens for Algebra lookup
     let token0 = tA
     let token1 = tB
     if (token0.toHexString() > token1.toHexString()) {
@@ -430,23 +418,18 @@ function findAndLinkPool(factory: AlgebraFactory, tA: Address, tB: Address, base
         let poolId = call.value.toHexString()
         let pool = NormalizedPool.load(poolId)
 
-        // REGISTRY PATTERN: Create pool on-demand if missing
         if (!pool) {
             pool = new NormalizedPool(poolId)
             pool.baseToken = createTokenInfo(token0)
             pool.quoteToken = createTokenInfo(token1)
-            pool.isBaseToken0 = true // Algebra always sorts token0 < token1
+            pool.isBaseToken0 = true
             pool.currentPrice = BigDecimal.zero()
             pool.volume24h = BigDecimal.zero()
-            log.info("Registry: Created missing pool {}", [poolId])
         }
 
-        // Link pool back to proposal
         pool.proposal = proposalId.toHexString()
         pool.save()
         return poolId
-    } else {
-        log.info("Pool lookup failed for pair: {} - {}", [tA.toHexString(), tB.toHexString()])
     }
     return null
 }
@@ -457,42 +440,20 @@ function createTokenInfo(addr: Address): string {
     let token = TokenInfo.load(id)
     if (!token) {
         token = new TokenInfo(id)
-
-        // Default / Fallback
         token.name = "Unknown Token"
         token.symbol = "UNK"
         token.decimals = BigInt.fromI32(18)
 
         if (addr != ZERO_ADDRESS) {
             let erc20 = ERC20.bind(addr)
-
-            // Name
             let callName = erc20.try_name()
-            if (!callName.reverted) {
-                token.name = callName.value
-            }
-
-            // Symbol: Try string then bytes32
+            if (!callName.reverted) token.name = callName.value
             let callSymbol = erc20.try_symbol()
-            if (!callSymbol.reverted) {
-                token.symbol = callSymbol.value
-            } else {
-                // Try bytes32
-                // We don't have a helper for this in standard generated code unless we update ABI
-                // But usually standard ERC20 abi only has string symbol()
-                // If it fails, we keep UNK. 
-                // Wait, user hates "TNK". We used "UNK".
-                // Maybe we can try to use the address subset?
-                token.symbol = "UNK-" + id.slice(2, 6)
-            }
-
-            // Decimals
+            if (!callSymbol.reverted) token.symbol = callSymbol.value
+            else token.symbol = "UNK-" + id.slice(2, 6)
             let callDecimals = erc20.try_decimals()
-            if (!callDecimals.reverted) {
-                token.decimals = BigInt.fromI32(callDecimals.value)
-            }
+            if (!callDecimals.reverted) token.decimals = BigInt.fromI32(callDecimals.value)
         }
-
         token.save()
     }
     return id
@@ -502,67 +463,3 @@ function getWrapped(contract: FutarchyProposal, index: i32): Address {
     let call = contract.try_wrappedOutcome(BigInt.fromI32(index))
     return !call.reverted ? call.value.getWrapped1155() : ZERO_ADDRESS
 }
-
-function getPrice(priceQ96: BigInt, decimal0: BigInt, decimal1: BigInt): BigDecimal {
-    let value = priceQ96.toBigDecimal()
-    let priceRaw = value.div(Q96).times(value.div(Q96))
-    let scaler0 = BigInt.fromI32(10).pow(decimal0.toI32() as u8).toBigDecimal()
-    let scaler1 = BigInt.fromI32(10).pow(decimal1.toI32() as u8).toBigDecimal()
-    return priceRaw.times(scaler0).div(scaler1)
-}
-
-function invert(price: BigDecimal): BigDecimal {
-    if (price.equals(BigDecimal.zero())) return BigDecimal.zero()
-    return BigDecimal.fromString("1").div(price)
-}
-
-/*
-function updateCandles(pool: NormalizedPool, timestamp: BigInt, price: BigDecimal, amount0: BigInt, amount1: BigInt): void {
-    // Calculate proposal age for tiered candle creation
-    let proposalAge: i32 = 0
-    if (pool.proposal) {
-        let proposal = UnifiedOneStopShop.load(pool.proposal!)
-        if (proposal && proposal.createdAtTimestamp.gt(BigInt.zero())) {
-            proposalAge = timestamp.minus(proposal.createdAtTimestamp).toI32()
-        }
-    }
-
-    // Update candles for each period based on age limits
-    for (let i = 0; i < CANDLE_PERIODS.length; i++) {
-        let maxAge = CANDLE_MAX_AGES[i]
-        // 0 means unlimited, otherwise check if within max age
-        if (maxAge == 0 || proposalAge < maxAge) {
-            updateCandleForPeriod(pool, timestamp, price, amount0, amount1, CANDLE_PERIODS[i])
-        }
-    }
-}
-*/
-
-/*
-function updateCandleForPeriod(pool: NormalizedPool, timestamp: BigInt, price: BigDecimal, amount0: BigInt, amount1: BigInt, period: i32): void {
-    let ts = timestamp.toI32()
-    let periodStart = (ts / period) * period
-    // ID format: poolId-period-periodStart (e.g., "0x123...-60-1699920000")
-    let id = pool.id + "-" + period.toString() + "-" + periodStart.toString()
-
-    let candle = UnifiedCandle.load(id)
-    if (!candle) {
-        candle = new UnifiedCandle(id)
-        candle.pool = pool.id
-        candle.time = BigInt.fromI32(periodStart)
-        candle.period = period
-        candle.open = price
-        candle.high = price
-        candle.low = price
-        candle.close = price
-        candle.volume = BigDecimal.zero()
-        candle.save()
-    } else {
-        if (price.gt(candle.high)) candle.high = price
-        if (price.lt(candle.low)) candle.low = price
-        candle.close = price
-        candle.save()
-    }
-}
-*/
-
