@@ -4,6 +4,8 @@ type Aggregator @entity(immutable: false) {
   id: ID! # Contract Address
   name: String!
   description: String!
+  metadata: String
+  metadataURI: String
   creator: Bytes!
   createdAt: BigInt!
   organizations: [Organization!]! @derivedFrom(field: "aggregator")
@@ -14,6 +16,8 @@ type Organization @entity(immutable: false) {
   aggregator: Aggregator!
   name: String!
   description: String!
+  metadata: String
+  metadataURI: String
   owner: Bytes!
   createdAt: BigInt!
   proposals: [UnifiedOneStopShop!]! @derivedFrom(field: "organization")
@@ -29,6 +33,8 @@ type UnifiedOneStopShop @entity(immutable: false) {
   # Metadata
   title: String!
   description: String!
+  metadata: String
+  metadataURI: String
   marketName: String!
   displayNameEvent: String!
   displayNameQuestion: String!

@@ -9,7 +9,7 @@ dataSources:
     source:
       address: "0xa6cB18FCDC17a2B44E5cAd2d80a6D5942d30a345"
       abi: FutarchyFactory
-      startBlock: 43512812
+      startBlock: 43957938
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -37,7 +37,7 @@ dataSources:
     source:
       address: "0xA0864cCA6E114013AB0e27cbd5B6f4c8947da766"
       abi: AlgebraFactory
-      startBlock: 43512812
+      startBlock: 43957938
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -63,9 +63,9 @@ dataSources:
     name: Creator
     network: gnosis
     source:
-      address: "0x511D18d5567d76bbd20dEaDF4F90CD9f039eEd2D"
+      address: "0x8ffCf8546DE700FB2Ceab4709fB26ee05A19652B"
       abi: Creator
-      startBlock: 43512812
+      startBlock: 43957938
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -112,6 +112,8 @@ templates:
       eventHandlers:
         - event: OrganizationAdded(indexed address)
           handler: handleOrganizationAdded
+        - event: ExtendedMetadataUpdated(string,string)
+          handler: handleExtendedMetadataUpdated
       file: ./src/mapping.ts
 
   - kind: ethereum/contract
@@ -138,6 +140,8 @@ templates:
       eventHandlers:
         - event: ProposalAdded(indexed address)
           handler: handleProposalAdded
+        - event: ExtendedMetadataUpdated(string,string)
+          handler: handleExtendedMetadataUpdated
       file: ./src/mapping.ts
 
   - kind: ethereum/contract
@@ -157,4 +161,6 @@ templates:
       eventHandlers:
         - event: MetadataUpdated(string,string,string)
           handler: handleProposalMetadataUpdated
+        - event: ExtendedMetadataUpdated(string,string)
+          handler: handleProposalExtendedMetadataUpdated
       file: ./src/mapping.ts

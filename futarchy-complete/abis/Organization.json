@@ -60,6 +60,25 @@
         "inputs": [
             {
                 "indexed": false,
+                "internalType": "string",
+                "name": "metadata",
+                "type": "string"
+            },
+            {
+                "indexed": false,
+                "internalType": "string",
+                "name": "metadataURI",
+                "type": "string"
+            }
+        ],
+        "name": "ExtendedMetadataUpdated",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": false,
                 "internalType": "uint64",
                 "name": "version",
                 "type": "uint64"
@@ -192,11 +211,47 @@
                 "internalType": "string",
                 "name": "_description",
                 "type": "string"
+            },
+            {
+                "internalType": "string",
+                "name": "_metadata",
+                "type": "string"
+            },
+            {
+                "internalType": "string",
+                "name": "_metadataURI",
+                "type": "string"
             }
         ],
         "name": "initialize",
         "outputs": [],
         "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "metadata",
+        "outputs": [
+            {
+                "internalType": "string",
+                "name": "",
+                "type": "string"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "metadataURI",
+        "outputs": [
+            {
+                "internalType": "string",
+                "name": "",
+                "type": "string"
+            }
+        ],
+        "stateMutability": "view",
         "type": "function"
     },
     {
@@ -265,6 +320,24 @@
             }
         ],
         "name": "updateCompanyInfo",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "string",
+                "name": "_metadata",
+                "type": "string"
+            },
+            {
+                "internalType": "string",
+                "name": "_metadataURI",
+                "type": "string"
+            }
+        ],
+        "name": "updateExtendedMetadata",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"

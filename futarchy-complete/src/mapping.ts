@@ -3,9 +3,9 @@ import { NewProposal } from "../generated/FutarchyFactory/FutarchyFactory"
 import { Pool as PoolEvent, AlgebraFactory } from "../generated/AlgebraFactory/AlgebraFactory"
 import { FutarchyProposal } from "../generated/FutarchyFactory/FutarchyProposal"
 import { AggregatorMetadataCreated } from "../generated/Creator/Creator"
-import { OrganizationAdded, AggregatorInfoUpdated } from "../generated/templates/AggregatorTemplate/Aggregator"
-import { ProposalAdded, CompanyInfoUpdated } from "../generated/templates/OrganizationTemplate/Organization"
-import { MetadataUpdated, Proposal as MetadataContract } from "../generated/templates/ProposalTemplate/Proposal"
+import { OrganizationAdded, AggregatorInfoUpdated, ExtendedMetadataUpdated as AggregatorExtendedMetadataUpdated } from "../generated/templates/AggregatorTemplate/Aggregator"
+import { ProposalAdded, CompanyInfoUpdated, ExtendedMetadataUpdated as OrganizationExtendedMetadataUpdated } from "../generated/templates/OrganizationTemplate/Organization"
+import { MetadataUpdated, Proposal as MetadataContract, ExtendedMetadataUpdated as ProposalExtendedMetadataUpdated } from "../generated/templates/ProposalTemplate/Proposal"
 // import { Swap } from "../generated/templates/AlgebraPool/AlgebraPool"
 import { ERC20 } from "../generated/FutarchyFactory/ERC20"
 
@@ -103,10 +103,16 @@ export function handleAggregatorCreated(event: AggregatorMetadataCreated): void 
     entity.creator = event.transaction.from
     entity.createdAt = event.block.timestamp
 
-    // Fetch description manually since it's not in event
+    // Fetch description & extended metadata manually
     let contract = AggregatorContract.bind(event.params.metadata)
     let dCall = contract.try_description()
     entity.description = !dCall.reverted ? dCall.value : ""
+
+    let mCall = contract.try_metadata()
+    entity.metadata = !mCall.reverted ? mCall.value : ""
+
+    let uCall = contract.try_metadataURI()
+    entity.metadataURI = !uCall.reverted ? uCall.value : ""
 
     entity.save()
 }
@@ -128,6 +134,12 @@ export function handleOrganizationAdded(event: OrganizationAdded): void {
 
     let oCall = contract.try_owner()
     entity.owner = !oCall.reverted ? oCall.value : event.transaction.from
+
+    let mCall = contract.try_metadata()
+    entity.metadata = !mCall.reverted ? mCall.value : ""
+
+    let uCall = contract.try_metadataURI()
+    entity.metadataURI = !uCall.reverted ? uCall.value : ""
 
     entity.save()
 
@@ -172,6 +184,38 @@ export function handleProposalMetadataUpdated(event: MetadataUpdated): void {
     entity.save()
 }
 
+// EXTENDED METADATA HANDLERS
+
+export function handleAggregatorExtendedMetadataUpdated(event: AggregatorExtendedMetadataUpdated): void {
+    let entity = Aggregator.load(event.address.toHexString())
+    if (entity) {
+        entity.metadata = event.params.metadata
+        entity.metadataURI = event.params.metadataURI
+        entity.save()
+    }
+}
+
+export function handleOrganizationExtendedMetadataUpdated(event: OrganizationExtendedMetadataUpdated): void {
+    let entity = Organization.load(event.address.toHexString())
+    if (entity) {
+        entity.metadata = event.params.metadata
+        entity.metadataURI = event.params.metadataURI
+        entity.save()
+    }
+}
+
+export function handleProposalExtendedMetadataUpdated(event: ProposalExtendedMetadataUpdated): void {
+    let contract = MetadataContract.bind(event.address)
+    let call = contract.try_proposalAddress()
+    if (call.reverted) return
+
+    let entity = getOrCreateUnifiedEntity(call.value)
+    entity.metadata = event.params.metadata
+    entity.metadataURI = event.params.metadataURI
+    entity.save()
+}
+
+
 // ============================================
 // 3. REUSABLE LINKING LOGIC (For Event & Historical Backfill)
 // ============================================
@@ -211,6 +255,12 @@ function linkProposalToOrganization(metadataAddr: Address, orgId: string): void 
 
     let dCall = contract.try_description()
     entity.description = !dCall.reverted ? dCall.value : "Loading..."
+
+    let mCall = contract.try_metadata()
+    entity.metadata = !mCall.reverted ? mCall.value : ""
+
+    let uCall = contract.try_metadataURI()
+    entity.metadataURI = !uCall.reverted ? uCall.value : ""
 
     // 5. REGISTRY: Always fetch Tokens & Pools (Treat Metadata as primary source)
     let tradeContract = FutarchyProposal.bind(tradingProposalId)
@@ -515,3 +565,4 @@ function updateCandleForPeriod(pool: NormalizedPool, timestamp: BigInt, price: B
     }
 }
 */
+

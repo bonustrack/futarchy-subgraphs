@@ -61,6 +61,16 @@
                 "internalType": "string",
                 "name": "description",
                 "type": "string"
+            },
+            {
+                "internalType": "string",
+                "name": "metadata",
+                "type": "string"
+            },
+            {
+                "internalType": "string",
+                "name": "metadataURI",
+                "type": "string"
             }
         ],
         "name": "createAggregatorMetadata",
