@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Futarchy Markets (Tailwind)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gray: {
+                            850: '#1f2937',
+                            900: '#111827',
+                            950: '#0b0f19',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lightweight Charts -->
+    <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+
+        .pool-tab.active {
+            background-color: #2563eb;
+            /* blue-600 */
+            color: white;
+            border-color: #2563eb;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-950 text-gray-200 h-screen w-screen overflow-hidden flex flex-col font-sans">
+
+    <!-- Header -->
+    <header class="h-14 border-b border-gray-800 bg-gray-900 flex items-center px-6 shrink-0 z-10">
+        <h1 class="text-xl font-bold tracking-tight text-white flex-1">Futarchy Markets</h1>
+        <div class="text-xs text-gray-500">v0.0.17 • Indexed at #42859858</div>
+    </header>
+
+    <!-- Main Grid Layout -->
+    <div class="flex-1 flex overflow-hidden">
+
+        <!-- SIDEBAR: Proposal List -->
+        <aside class="w-80 border-r border-gray-800 bg-gray-900 flex flex-col shrink-0">
+            <!-- Search / Filter -->
+            <div class="p-3 border-b border-gray-800 flex gap-2">
+                <input type="text" id="searchInput" placeholder="Search ID or Name..."
+                    class="w-full bg-gray-800 border border-gray-700 text-sm rounded px-3 py-2 focus:outline-none focus:border-blue-500"
+                    oninput="filterProposals(this.value)"
+                    onkeydown="if(event.key === 'Enter') fetchSpecificProposal(this.value.trim())">
+                <button onclick="fetchSpecificProposal(document.getElementById('searchInput').value.trim())"
+                    class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded text-sm font-medium transition">
+                    Go
+                </button>
+            </div>
+
+            <!-- List Container -->
+            <div id="proposalList" class="flex-1 overflow-y-auto p-2 space-y-2">
+                <!-- Proposals Injected Here -->
+                <div class="text-center text-gray-500 py-10" id="loadingProposals">Loading...</div>
+            </div>
+
+            <div class="p-3 border-t border-gray-800">
+                <button onclick="fetchProposals()" id="loadMoreBtn"
+                    class="w-full text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 py-2 rounded transition">
+                    Load More
+                </button>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT: Market Detail -->
+        <main class="flex-1 flex flex-col min-w-0 bg-gray-950 relative">
+
+            <!-- Empty State -->
+            <div id="emptyState"
+                class="absolute inset-0 flex items-center justify-center text-gray-600 pointer-events-none">
+                <div class="text-center">
+                    <svg class="w-16 h-16 mx-auto mb-4 opacity-20" fill="currentColor" viewBox="0 0 20 20">
+                        <path
+                            d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z">
+                        </path>
+                    </svg>
+                    <span>Select a proposal to view details</span>
+                </div>
+            </div>
+
+            <!-- Content Container (Hidden until selected) -->
+            <div id="marketContent" class="flex-col h-full hidden">
+
+                <!-- Market Header & Pools -->
+                <div class="border-b border-gray-800 bg-gray-900 p-4 shrink-0">
+                    <div class="flex justify-between items-center mb-3">
+                        <h2 id="marketTitle" class="text-lg font-semibold text-white truncate flex-1">Market Name</h2>
+                        <div id="currentPrice" class="text-2xl font-mono font-bold text-gray-400 tracking-tight">--
+                        </div>
+                    </div>
+
+                    <!-- Pools Ribbon -->
+                    <div id="poolsContainer" class="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                        <!-- Pool Tabs Injected Here -->
+                    </div>
+                </div>
+
+                <!-- Split Pane: Chart (Top) & Activity (Bottom) -->
+                <!-- Use Grid or Flex. Let's use Flex col to allow easy resizing later if needed -->
+
+                <!-- CHART SECTION (60% Height) -->
+                <div class="flex-[3] border-b border-gray-800 flex flex-col min-h-0 relative group">
+                    <!-- Chart Controls -->
+                    <div class="absolute top-3 left-3 z-[20] flex gap-1 opacity-100 transition-opacity">
+                        <button
+                            class="bg-gray-800/80 hover:bg-gray-700 text-gray-300 text-xs px-2 py-1 rounded backdrop-blur border border-gray-700"
+                            onclick="setPeriod(60)">1m</button>
+                        <button
+                            class="bg-gray-800/80 hover:bg-gray-700 text-gray-300 text-xs px-2 py-1 rounded backdrop-blur border border-gray-700"
+                            onclick="setPeriod(300)">5m</button>
+                        <button
+                            class="bg-gray-800/80 hover:bg-gray-700 text-gray-300 text-xs px-2 py-1 rounded backdrop-blur border border-gray-700"
+                            onclick="setPeriod(900)">15m</button>
+                        <button class="bg-blue-600 text-white text-xs px-2 py-1 rounded backdrop-blur shadow"
+                            onclick="setPeriod(3600)">1h</button>
+                        <button
+                            class="bg-gray-800/80 hover:bg-gray-700 text-gray-300 text-xs px-2 py-1 rounded backdrop-blur border border-gray-700"
+                            onclick="setPeriod(14400)">4h</button>
+                        <button
+                            class="bg-gray-800/80 hover:bg-gray-700 text-gray-300 text-xs px-2 py-1 rounded backdrop-blur border border-gray-700"
+                            onclick="setPeriod(86400)">1d</button>
+                    </div>
+
+                    <div id="chartContainer" class="w-full h-full"></div>
+                </div>
+
+                <!-- ACTIVITY SECTION (40% Height) -->
+                <div class="flex-[2] flex flex-col min-h-0 bg-gray-900/50">
+                    <div
+                        class="px-4 py-2 border-b border-gray-800 text-xs font-semibold text-gray-500 uppercase flex justify-between">
+                        <span>Recent Activity</span>
+                        <span id="activityStatus">Waiting for pool...</span>
+                    </div>
+
+                    <div class="overflow-y-auto flex-1 p-0">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="sticky top-0 bg-gray-900 text-xs text-gray-500 font-medium">
+                                <tr>
+                                    <th class="p-3 border-b border-gray-800">Time</th>
+                                    <th class="p-3 border-b border-gray-800">Tx</th>
+                                    <th class="p-3 border-b border-gray-800">Maker</th>
+                                    <th class="p-3 border-b border-gray-800">Action</th>
+                                    <th class="p-3 border-b border-gray-800 text-right">In</th>
+                                    <th class="p-3 border-b border-gray-800 text-right">Out</th>
+                                    <th class="p-3 border-b border-gray-800 text-right">Price</th>
+                                </tr>
+                            </thead>
+                            <tbody id="swapsTable" class="text-sm divide-y divide-gray-800 font-mono text-xs">
+                                <!-- Swap Rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // CONFIG
+        const SUBGRAPH_URL = "https://api.studio.thegraph.com/query/1719045/algebra-proposal-candles/v0.0.26";
+
+        // APP STATE
+        let allProposals = [];
+        let proposalSkip = 0;
+        let currentPoolId = null;
+        let currentPeriod = 3600;
+        let chart = null;
+        let candleSeries = null;
+        let priceInterval = null;
+
+        // --- INIT ---
+        window.onload = () => {
+            initChart();
+            fetchProposals();
+        };
+
+        // --- SUBGRAPH FETCHER ---
+        async function gql(query) {
+            try {
+                const res = await fetch(SUBGRAPH_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+                return await res.json();
+            } catch (e) {
+                console.error("GQL Error", e);
+                return { errors: [e] };
+            }
+        }
+
+        // --- PROPOSALS ---
+        async function fetchProposals() {
+            const btn = document.getElementById('loadMoreBtn');
+            btn.innerText = "Loading...";
+
+            const query = `{
+                proposals(first: 100, skip: ${proposalSkip}, orderBy: id, orderDirection: desc) {
+                    id
+                    marketName
+                    pools(where: { liquidity_gt: 0 }) {
+                        id
+                    }
+                }
+            }`;
+
+            const { data } = await gql(query);
+
+            if (data && data.proposals) {
+                // Filter Logic: >5 pools, name is not "futa"
+                const newProps = data.proposals.filter(p => {
+                    if ((p.pools ? p.pools.length : 0) < 6) return false;
+                    if ((p.marketName || "").toLowerCase() === "futa") return false;
+                    return true;
+                });
+
+                allProposals = [...allProposals, ...newProps];
+                renderProposals(allProposals);
+
+                proposalSkip += 100;
+
+                if (data.proposals.length < 100) btn.style.display = 'none';
+                else btn.innerText = "Load More";
+            }
+
+            const loading = document.getElementById('loadingProposals');
+            if (loading) loading.style.display = 'none';
+        }
+
+
+
+        async function filterProposals(val) {
+            const term = val.toLowerCase().trim();
+
+            // 1. If it looks like an address (0x... 42 chars) and not in list, try to fetch it
+            if (term.startsWith('0x') && term.length === 42) {
+                const exists = allProposals.find(p => p.id.toLowerCase() === term);
+                if (!exists) {
+                    await fetchSpecificProposal(term);
+                    return;
+                }
+            }
+
+            renderProposals(allProposals);
+        }
+
+        async function fetchSpecificProposal(idRaw) {
+            const id = idRaw.toLowerCase();
+            const btn = document.getElementById('loadMoreBtn');
+            const prevText = btn.innerText;
+            btn.innerText = "Searching Network...";
+
+            // Basic validation or auto-fix
+            const queryId = id.startsWith('0x') ? id : '0x' + id; // Try prepending 0x if missing
+
+            const query = `{
+                proposal(id: "${queryId}") {
+                    id
+                    marketName
+                    pools(where: { liquidity_gt: 0 }) {
+                        id
+                    }
+                }
+            }`;
+
+            try {
+                const { data } = await gql(query);
+                if (data && data.proposal) {
+                    // Check if already exists
+                    const exists = allProposals.find(p => p.id === data.proposal.id);
+                    if (!exists) {
+                        allProposals.unshift(data.proposal);
+                    }
+                    // Force render with this ID selected/visible
+                    renderProposals(allProposals);
+                } else {
+                    console.log("Proposal ID not found directly");
+                    alert("Proposal not found on network: " + queryId);
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Error searching network");
+            }
+
+            btn.innerText = prevText;
+        }
+
+        function renderProposals(list) {
+            const container = document.getElementById('proposalList');
+            container.innerHTML = '';
+
+            const term = document.getElementById('searchInput').value.toLowerCase().trim();
+            const filtered = list.filter(p =>
+                (p.marketName || "").toLowerCase().includes(term) || p.id.toLowerCase().includes(term)
+            );
+
+            filtered.forEach(p => {
+                const el = document.createElement('div');
+                el.className = "p-3 bg-gray-800 hover:bg-gray-700/50 rounded border border-gray-700/50 cursor-pointer transition group";
+                el.onclick = () => loadMarket(p);
+
+                el.innerHTML = `
+                    <div class="text-sm font-medium text-gray-200 group-hover:text-white line-clamp-2 leading-snug mb-1">
+                        ${p.marketName || "Untitled Market"}
+                    </div>
+                    <div class="flex items-center justify-between text-xs text-gray-500">
+                        <span class="font-mono opacity-50">${p.id.slice(0, 6)}...${p.id.slice(-4)}</span>
+                        <span class="bg-green-900/30 text-green-400 px-1.5 py-0.5 rounded">${p.pools.length} Pools</span>
+                    </div>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        function filterProposals(term) {
+            renderProposals(allProposals);
+        }
+
+        // --- MARKET LOADING ---
+        async function loadMarket(proposal) {
+            // UI Switch
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('marketContent').classList.remove('hidden');
+            document.getElementById('marketContent').classList.add('flex');
+            document.getElementById('marketTitle').innerText = proposal.marketName || "Unknown Market";
+            document.getElementById('poolsContainer').innerHTML = "<div class='text-xs text-gray-500 p-2'>Loading pools...</div>";
+            document.getElementById('swapsTable').innerHTML = "";
+
+            // Clean Chart
+            if (candleSeries) candleSeries.setData([]);
+
+            // Fetch Pools Details
+            const query = `{
+                proposal(id: "${proposal.id}") {
+                    pools(where: { liquidity_gt: 0 }) {
+                        id
+                        name
+                        type
+                        outcomeSide
+                        price
+                        token0 { symbol }
+                        token1 { symbol }
+                    }
+                }
+            }`;
+
+            const { data } = await gql(query);
+
+            if (data && data.proposal) {
+                const pools = data.proposal.pools;
+                pools.sort((a, b) => a.type.localeCompare(b.type)); // Sort types together
+                renderPoolTabs(pools);
+
+                if (pools.length > 0) selectPool(pools[0]);
+            }
+        }
+
+        function renderPoolTabs(pools) {
+            const container = document.getElementById('poolsContainer');
+            container.innerHTML = "";
+
+            pools.forEach(pool => {
+                const btn = document.createElement('button');
+                // Color Logic
+                let typeColor = "text-gray-400 border-gray-700 hover:border-gray-500";
+                if (pool.type === "EXPECTED_VALUE") typeColor = "text-blue-400 border-blue-900/50 bg-blue-900/10";
+                if (pool.type === "PREDICTION") typeColor = "text-red-400 border-red-900/50 bg-red-900/10";
+                if (pool.type === "CONDITIONAL") typeColor = "text-green-400 border-green-900/50 bg-green-900/10";
+
+                btn.className = `pool-tab shrink-0 px-3 py-1.5 rounded border text-xs font-medium cursor-pointer transition ${typeColor}`;
+                let sideBadge = "";
+                if (pool.outcomeSide === "YES") sideBadge = `<span class="bg-green-500/20 text-green-400 text-[10px] px-1 rounded ml-1 border border-green-500/30">YES</span>`;
+                if (pool.outcomeSide === "NO") sideBadge = `<span class="bg-red-500/20 text-red-400 text-[10px] px-1 rounded ml-1 border border-red-500/30">NO</span>`;
+
+                btn.innerHTML = `<span class="opacity-75">${pool.type}</span>${sideBadge} <span class="text-gray-200 ml-1">${pool.name}</span>`;
+                btn.onclick = () => {
+                    document.querySelectorAll('.pool-tab').forEach(t => t.classList.remove('ring-1', 'ring-white'));
+                    btn.classList.add('ring-1', 'ring-white');
+                    selectPool(pool);
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        async function selectPool(pool) {
+            currentPoolId = pool.id;
+            document.getElementById('activityStatus').innerText = `Loading ${pool.type} trades...`;
+            document.getElementById('currentPrice').innerText = "--";
+
+            // Cleanup previous poll
+            if (priceInterval) clearInterval(priceInterval);
+
+            // 1. Initial Load
+            fetchCandles();
+            fetchSwaps(pool.id);
+            pollPrice();
+
+            // 2. Start Polling (every 5 seconds)
+            priceInterval = setInterval(pollPrice, 5000);
+        }
+
+        async function pollPrice() {
+            if (!currentPoolId) return;
+            // Fetch latest price from Pool entity (v0.0.24+)
+            const query = `{
+                pool(id: "${currentPoolId}") {
+                    price
+                    type
+                }
+            }`;
+
+            const { data } = await gql(query);
+            if (data && data.pool) {
+                const raw = parseFloat(data.pool.price);
+                const isPrediction = data.pool.type === 'PREDICTION';
+
+                let display = isPrediction ? (raw * 100).toFixed(1) + "%" : smartFormat(raw);
+                const el = document.getElementById('currentPrice');
+
+                // Color update
+                el.innerText = display;
+                el.className = `text-2xl font-mono font-bold tracking-tight ${isPrediction ? "text-yellow-400" : "text-blue-400"}`;
+            }
+        }
+
+
+        // --- CHART ENGINE ---
+        function initChart() {
+            const container = document.getElementById('chartContainer');
+            chart = LightweightCharts.createChart(container, {
+                layout: {
+                    backgroundColor: 'transparent',
+                    textColor: '#9ca3af',
+                    fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+                },
+                grid: {
+                    vertLines: { color: '#374151' },
+                    horzLines: { color: '#374151' },
+                },
+                rightPriceScale: {
+                    borderColor: '#374151',
+                },
+                timeScale: {
+                    borderColor: '#374151',
+                    timeVisible: true,
+                },
+                crosshair: {
+                    mode: LightweightCharts.CrosshairMode.Normal,
+                },
+            });
+
+            candleSeries = chart.addCandlestickSeries({
+                upColor: '#22c55e', // green-500
+                downColor: '#ef4444', // red-500
+                borderVisible: false,
+                wickUpColor: '#22c55e',
+                wickDownColor: '#ef4444',
+            });
+
+            // Resize Observer
+            new ResizeObserver(entries => {
+                const rect = entries[0].contentRect;
+                chart.resize(rect.width, rect.height);
+            }).observe(container);
+        }
+
+        async function fetchCandles() {
+            if (!currentPoolId) return;
+            const period = currentPeriod;
+
+            const query = `{
+                candles(first: 1000, orderBy: time, orderDirection: asc, where: { pool: "${currentPoolId}", period: ${period} }) {
+                    time, open, high, low, close
+                }
+            }`;
+
+            const { data } = await gql(query);
+
+            if (data && data.candles) {
+                // Parse & Unique
+                let raw = data.candles.map(c => ({
+                    time: parseInt(c.time),
+                    open: parseFloat(c.open),
+                    high: parseFloat(c.high),
+                    low: parseFloat(c.low),
+                    close: parseFloat(c.close)
+                })).sort((a, b) => a.time - b.time);
+
+                const unique = [];
+                const times = new Set();
+                raw.forEach(c => {
+                    if (!times.has(c.time)) {
+                        times.add(c.time);
+                        unique.push(c);
+                    }
+                });
+
+                if (unique.length === 0) {
+                    if (candleSeries) candleSeries.setData([]);
+                    return;
+                }
+
+                // --- DYNAMIC PRECISION LOGIC ---
+                const avg = unique.reduce((a, b) => a + b.close, 0) / unique.length;
+                let prec = 2, minMov = 0.01;
+
+                if (avg < 0.000001) { prec = 8; minMov = 0.00000001; }
+                else if (avg < 0.0001) { prec = 7; minMov = 0.0000001; }
+                else if (avg < 0.01) { prec = 6; minMov = 0.000001; }
+                else if (avg < 1) { prec = 4; minMov = 0.0001; }
+
+                candleSeries.applyOptions({
+                    priceFormat: { type: 'price', precision: prec, minMove: minMov }
+                });
+                // -------------------------------
+
+                candleSeries.setData(unique);
+                chart.timeScale().fitContent();
+            }
+        }
+
+        function setPeriod(p) {
+            currentPeriod = p;
+            fetchCandles(); // Refresh chart
+        }
+
+        // --- SWAPS TABLE ---
+        async function fetchSwaps(poolId) {
+            console.log(`Fetching swaps for pool: ${poolId}`);
+            const shortId = poolId.substring(0, 6) + "..." + poolId.substring(38);
+            document.getElementById('activityStatus').innerText = `Loading ${poolId.substring(0, 6)}...`;
+            const table = document.getElementById('swapsTable');
+            table.innerHTML = "<tr><td colspan='7' class='p-4 text-center text-gray-600'>Loading trades...</td></tr>";
+
+            const query = `{
+                swaps(first: 50, orderBy: timestamp, orderDirection: desc, where: { pool: "${poolId}" }) {
+                    timestamp, transactionHash, origin, 
+                    pool { type }, 
+                    tokenIn { symbol }, tokenOut { symbol }, 
+                    amountIn, amountOut, price
+                }
+            }`;
+
+            const { data } = await gql(query);
+            table.innerHTML = "";
+
+            console.log("Swaps data:", data);
+
+            if (!data || !data.swaps || data.swaps.length === 0) {
+                table.innerHTML = "<tr><td colspan='7' class='p-4 text-center text-gray-600'>No recent activity for " + shortId + "</td></tr>";
+                document.getElementById('activityStatus').innerText = "Live (" + shortId + ")";
+                return;
+            }
+
+            document.getElementById('activityStatus').innerText = "Live (" + shortId + ")";
+
+            data.swaps.forEach(s => {
+                const row = document.createElement('tr');
+                row.className = "hover:bg-gray-800/50 transition border-b border-gray-800/50";
+
+                // Formatters
+                const time = new Date(parseInt(s.timestamp) * 1000).toLocaleTimeString();
+                const txShort = s.transactionHash.slice(0, 6);
+                const makerShort = s.origin.slice(0, 6);
+                const type = s.pool.type;
+                const isPrediction = type === 'PREDICTION';
+
+                // Price
+                let priceRaw = parseFloat(s.price);
+                let priceStr = isPrediction ? (priceRaw * 100).toFixed(1) + "%" : smartFormat(priceRaw);
+                let priceColor = isPrediction ? "text-yellow-400" : "text-blue-400";
+
+                // Amounts
+                const inAmt = smartFormat(parseFloat(s.amountIn));
+                const outAmt = smartFormat(parseFloat(s.amountOut));
+
+                row.innerHTML = `
+                    <td class="p-3 text-gray-400 whitespace-nowrap">${time}</td>
+                    <td class="p-3"><a href="https://gnosisscan.io/tx/${s.transactionHash}" target="_blank" class="text-blue-500 hover:underline">${txShort}</a></td>
+                    <td class="p-3 text-gray-500" title="${s.origin}">${makerShort}</td>
+                    <td class="p-3">
+                        <span class="text-red-400">Sell ${s.tokenIn.symbol}</span> 
+                        <span class="text-gray-600">-></span> 
+                        <span class="text-green-400">Buy ${s.tokenOut.symbol}</span>
+                    </td>
+                    <td class="p-3 text-right text-gray-300">${inAmt}</td>
+                    <td class="p-3 text-right text-gray-300">${outAmt}</td>
+                    <td class="p-3 text-right font-bold ${priceColor}">${priceStr}</td>
+                `;
+                table.appendChild(row);
+            });
+        }
+
+        function smartFormat(num) {
+            if (num === 0) return "0";
+            if (num < 0.0001) return num.toFixed(8).replace(/\.?0+$/, "");
+            if (num < 1) return num.toFixed(4);
+            return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
+        }
+
+    </script>
+</body>
+
+</html>

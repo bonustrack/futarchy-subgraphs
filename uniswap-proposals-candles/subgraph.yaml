@@ -1,0 +1,82 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  # 1. Futarchy Factory - To Whitelist Tokens
+  - kind: ethereum
+    name: FutarchyFactory
+    network: mainnet
+    source:
+      address: "0xf9369c0F7a84CAC3b7Ef78c837cF7313309D3678"
+      abi: FutarchyFactory
+      startBlock: 24068680
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - WhitelistedToken
+        - Proposal
+      abis:
+        - name: FutarchyFactory
+          file: ./abis/FutarchyFactory.json
+        - name: FutarchyProposal
+          file: ./abis/FutarchyProposal.json
+        - name: ERC20
+          file: ./abis/ERC20.json
+      eventHandlers:
+        - event: NewProposal(indexed address,string,bytes32,bytes32)
+          handler: handleNewProposal
+      file: ./src/mapping.ts
+
+  # 2. Uniswap V3 Factory - To Index Pools (Filtered)
+  - kind: ethereum
+    name: UniswapV3Factory
+    network: mainnet
+    source:
+      address: "0x1F98431c8aD98523631AE4a59f267346ea31F984"
+      abi: UniswapV3Factory
+      startBlock: 24068680
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Pool
+      abis:
+        - name: UniswapV3Factory
+          file: ./abis/UniswapV3Factory.json
+        - name: ERC20
+          file: ./abis/ERC20.json
+        - name: UniswapV3Pool
+          file: ./abis/UniswapV3Pool.json
+      eventHandlers:
+        - event: PoolCreated(indexed address,indexed address,indexed uint24,int24,address)
+          handler: handlePoolCreated
+      file: ./src/mapping.ts
+
+templates:
+  - kind: ethereum/contract
+    name: UniswapV3Pool
+    network: mainnet
+    source:
+      abi: UniswapV3Pool
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Pool
+        - Candle
+        - Swap
+      abis:
+        - name: UniswapV3Pool
+          file: ./abis/UniswapV3Pool.json
+      eventHandlers:
+        - event: Swap(indexed address,indexed address,int256,int256,uint160,uint128,int24)
+          handler: handleSwap
+        - event: Mint(address,indexed address,indexed int24,indexed int24,uint128,uint256,uint256)
+          handler: handleMint
+        - event: Burn(indexed address,indexed int24,indexed int24,uint128,uint256,uint256)
+          handler: handleBurn
+      file: ./src/mapping.ts
