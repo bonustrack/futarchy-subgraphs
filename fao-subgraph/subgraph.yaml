@@ -6,9 +6,9 @@ dataSources:
     name: FAOSale
     network: gnosis
     source:
-      address: "0x460915528ce37ec66a26b98b791db512bc62dc17"
+      address: "0x3F3aB07ad792bb89DFf7528D1cef78372B0d8B93"
       abi: FAOSale
-      startBlock: 43382150
+      startBlock: 43961703
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7

@@ -4,7 +4,8 @@ import { PoolCreated } from "../generated/UniswapV3Factory/UniswapV3Factory"
 import {
     Swap as SwapEvent,
     Mint as MintEvent,
-    Burn as BurnEvent
+    Burn as BurnEvent,
+    Initialize as InitializeEvent
 } from "../generated/templates/UniswapV3Pool/UniswapV3Pool"
 import { UniswapV3Pool } from "../generated/templates"
 import { FutarchyProposal } from "../generated/FutarchyFactory/FutarchyProposal"
@@ -239,6 +240,57 @@ export function handlePoolCreated(event: PoolCreated): void {
     // Start Indexing
     UniswapV3Pool.create(event.params.pool)
     log.info("Indexing Proposal Pool: {}", [poolId])
+}
+
+// Handle Initialize event - captures initial pool price before any swaps
+export function handleInitialize(event: InitializeEvent): void {
+    let poolId = event.address.toHexString()
+    let pool = Pool.load(poolId)
+    if (!pool) {
+        log.warning("Initialize event for unknown pool: {}", [poolId])
+        return
+    }
+
+    // LOAD TOKENS FOR DECIMALS
+    let t0 = WhitelistedToken.load(pool.token0)
+    let t1 = WhitelistedToken.load(pool.token1)
+    let d0 = BigInt.fromI32(18)
+    if (t0 && t0.decimals) {
+        d0 = t0.decimals!
+    }
+
+    let d1 = BigInt.fromI32(18)
+    if (t1 && t1.decimals) {
+        d1 = t1.decimals!
+    }
+
+    // Convert BigInt decimals to exponents
+    let pow0 = BigInt.fromI32(10).pow(d0.toI32() as u8).toBigDecimal()
+    let pow1 = BigInt.fromI32(10).pow(d1.toI32() as u8).toBigDecimal()
+
+    // --- PRICE CALCULATION (same logic as handleSwap) ---
+    // 1. Raw price from SqrtPriceX96 (Token1 per Token0, disregarding decimals)
+    let priceRaw = convertSqrtPriceX96(event.params.sqrtPriceX96)
+
+    // 2. Adjust for Decimals: Price = priceRaw * (10^d0 / 10^d1)
+    let decimalAdjust = pow0.div(pow1)
+    let priceAdjusted = priceRaw.times(decimalAdjust)
+
+    // 3. User Perspective (Inversion)
+    let priceUser = priceAdjusted
+    if (pool.isInverted) {
+        if (priceAdjusted.gt(BigDecimal.zero())) {
+            priceUser = BigDecimal.fromString("1").div(priceAdjusted)
+        }
+    }
+
+    // UPDATE POOL INITIAL PRICE
+    pool.sqrtPrice = event.params.sqrtPriceX96
+    pool.tick = BigInt.fromI32(event.params.tick)
+    pool.price = priceUser
+    pool.save()
+
+    log.info("Pool {} Initialized with price: {}", [poolId, priceUser.toString()])
 }
 
 const CANDLE_PERIODS: i32[] = [60, 300, 900, 3600, 14400, 86400]

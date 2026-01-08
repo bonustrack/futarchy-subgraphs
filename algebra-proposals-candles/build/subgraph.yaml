@@ -18,11 +18,11 @@ dataSources:
         - Proposal
       abis:
         - name: FutarchyFactory
-          file: FutarchyFactory\FutarchyFactory.json
+          file: FutarchyFactory\abis\FutarchyFactory.json
         - name: FutarchyProposal
-          file: FutarchyFactory\FutarchyProposal.json
+          file: FutarchyFactory\abis\FutarchyProposal.json
         - name: ERC20
-          file: FutarchyFactory\ERC20.json
+          file: FutarchyFactory\abis\ERC20.json
       eventHandlers:
         - event: NewProposal(indexed address,string,bytes32,bytes32)
           handler: handleNewProposal
@@ -42,11 +42,11 @@ dataSources:
         - Pool
       abis:
         - name: AlgebraFactory
-          file: AlgebraFactory\AlgebraFactory.json
+          file: AlgebraFactory\abis\AlgebraFactory.json
         - name: ERC20
-          file: AlgebraFactory\ERC20.json
+          file: AlgebraFactory\abis\ERC20.json
         - name: AlgebraPool
-          file: AlgebraFactory\AlgebraPool.json
+          file: AlgebraFactory\abis\AlgebraPool.json
       eventHandlers:
         - event: Pool(indexed address,indexed address,address)
           handler: handlePoolCreated
@@ -67,8 +67,10 @@ templates:
         - Swap
       abis:
         - name: AlgebraPool
-          file: AlgebraPool\AlgebraPool.json
+          file: AlgebraPool\abis\AlgebraPool.json
       eventHandlers:
+        - event: Initialize(uint160,int24)
+          handler: handleInitialize
         - event: Swap(indexed address,indexed address,int256,int256,uint160,uint128,int24)
           handler: handleSwap
         - event: Mint(address,indexed address,indexed int24,indexed int24,uint128,uint256,uint256)

@@ -1,0 +1,8 @@
+Target URL: https://api.studio.thegraph.com/query/1718249/uniswap-proposals-candles/v0.0.1
+
+--- Testing: Simple Query ---
+✅ Success!
+
+
+--- Testing: Failing Query ---
+✅ Success!

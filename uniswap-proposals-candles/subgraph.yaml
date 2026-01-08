@@ -9,7 +9,7 @@ dataSources:
     source:
       address: "0xf9369c0F7a84CAC3b7Ef78c837cF7313309D3678"
       abi: FutarchyFactory
-      startBlock: 24068680
+      startBlock: 23807860
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -36,7 +36,7 @@ dataSources:
     source:
       address: "0x1F98431c8aD98523631AE4a59f267346ea31F984"
       abi: UniswapV3Factory
-      startBlock: 24068680
+      startBlock: 23807860
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -73,6 +73,8 @@ templates:
         - name: UniswapV3Pool
           file: ./abis/UniswapV3Pool.json
       eventHandlers:
+        - event: Initialize(uint160,int24)
+          handler: handleInitialize
         - event: Swap(indexed address,indexed address,int256,int256,uint160,uint128,int24)
           handler: handleSwap
         - event: Mint(address,indexed address,indexed int24,indexed int24,uint128,uint256,uint256)

@@ -59,7 +59,7 @@
     <!-- Header -->
     <header class="h-14 border-b border-gray-800 bg-gray-900 flex items-center px-6 shrink-0 z-10">
         <h1 class="text-xl font-bold tracking-tight text-white flex-1">Futarchy Markets</h1>
-        <div class="text-xs text-gray-500">v0.0.17 • Indexed at #42859858</div>
+        <div class="text-xs text-gray-500">v0.0.1 • Uniswap V3 (Mainnet)</div>
     </header>
 
     <!-- Main Grid Layout -->
@@ -189,7 +189,7 @@
 
     <script>
         // CONFIG
-        const SUBGRAPH_URL = "https://api.studio.thegraph.com/query/1719045/algebra-proposal-candles/v0.0.26";
+        const SUBGRAPH_URL = "https://api.studio.thegraph.com/query/1718248/uniswap-proposals-candles/v0.0.1";
 
         // APP STATE
         let allProposals = [];
@@ -608,7 +608,7 @@
 
                 row.innerHTML = `
                     <td class="p-3 text-gray-400 whitespace-nowrap">${time}</td>
-                    <td class="p-3"><a href="https://gnosisscan.io/tx/${s.transactionHash}" target="_blank" class="text-blue-500 hover:underline">${txShort}</a></td>
+                    <td class="p-3"><a href="https://etherscan.io/tx/${s.transactionHash}" target="_blank" class="text-blue-500 hover:underline">${txShort}</a></td>
                     <td class="p-3 text-gray-500" title="${s.origin}">${makerShort}</td>
                     <td class="p-3">
                         <span class="text-red-400">Sell ${s.tokenIn.symbol}</span> 

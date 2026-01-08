@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Subgraph Connection Debugger</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            background: #111;
+            color: #eee;
+        }
+
+        .box {
+            padding: 15px;
+            border: 1px solid #333;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            background: #222;
+        }
+
+        .status {
+            font-weight: bold;
+        }
+
+        .success {
+            color: #4f4;
+        }
+
+        .error {
+            color: #f44;
+        }
+
+        code {
+            background: #333;
+            padding: 2px 5px;
+            border-radius: 3px;
+            display: block;
+            margin: 5px 0;
+            overflow-wrap: break-word;
+        }
+
+        button {
+            padding: 8px 16px;
+            cursor: pointer;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        pre {
+            background: #000;
+            padding: 10px;
+            overflow: auto;
+            max-height: 300px;
+            font-size: 12px;
+            border: 1px solid #444;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Subgraph Debugger (ID: 1718248)</h1>
+
+    <div class="box">
+        <h3>1. Version v0.0.1</h3>
+        <code>https://api.studio.thegraph.com/query/1718248/uniswap-proposals-candles/v0.0.1</code>
+        <button onclick="testConnection('v0.0.1')">Test v0.0.1</button>
+    </div>
+
+    <div class="box">
+        <h3>2. Version Latest</h3>
+        <code>https://api.studio.thegraph.com/query/1718248/uniswap-proposals-candles/version/latest</code>
+        <button onclick="testConnection('latest')">Test Latest</button>
+    </div>
+
+    <div class="box">
+        <h3>3. Direct Deployment (QmHash)</h3>
+        <code>https://api.studio.thegraph.com/query/1718248/uniswap-proposals-candles/id/QmZNePVbYTSSLF9J2fW9k1Yc5j3xNXgLNL78vXkBucfQx8</code>
+        <button onclick="testConnection('qm')">Test QmHash</button>
+    </div>
+
+    <div class="box">
+        <h3>Results</h3>
+        <div id="results" class="box" style="background: #000; min-height: 100px;">Waiting to run test...</div>
+    </div>
+
+    <script>
+        const URLS = {
+            'v0.0.1': "https://api.studio.thegraph.com/query/1718248/uniswap-proposals-candles/v0.0.1",
+            'latest': "https://api.studio.thegraph.com/query/1718248/uniswap-proposals-candles/version/latest",
+            'qm': "https://api.studio.thegraph.com/query/1718248/uniswap-proposals-candles/id/QmZNePVbYTSSLF9J2fW9k1Yc5j3xNXgLNL78vXkBucfQx8"
+        };
+
+        const TEST_QUERY = `
+        {
+            _meta { block { number } }
+            proposals(first: 1) { id }
+        }`;
+
+        async function testConnection(key) {
+            const url = URLS[key];
+            const resultDiv = document.getElementById('results');
+            resultDiv.innerHTML = `<span class="status" style="color:yellow">Testing ${key}...</span>`;
+
+            console.log(`Testing URL: ${url}`);
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: TEST_QUERY })
+                });
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    resultDiv.innerHTML = `<div class="status error">HTTP Error: ${response.status}</div><pre>${text}</pre>`;
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (data.message && data.message === "Not found") {
+                    resultDiv.innerHTML = `
+                        <div class="status error">GATEWAY ERROR: Not Found</div>
+                        <p>The ID 1718248 might be incorrect or the subgraph is not associated with it.</p>
+                     `;
+                    return;
+                }
+
+                if (data.errors) {
+                    resultDiv.innerHTML = `<div class="status error">Graph Errors</div><pre>${JSON.stringify(data.errors, null, 2)}</pre>`;
+                } else {
+                    const block = data.data._meta ? data.data._meta.block.number : "Unknown";
+                    resultDiv.innerHTML = `
+                        <div class="status success">SUCCESS!</div>
+                        <p>Connected to <strong>${key}</strong></p>
+                        <p>Synced Block: <strong>${block}</strong></p>
+                        <pre>${JSON.stringify(data.data, null, 2)}</pre>
+                    `;
+                }
+
+            } catch (err) {
+                resultDiv.innerHTML = `<div class="status error">Network Error</div><pre>${err.message}</pre>`;
+                console.error(err);
+            }
+        }
+    </script>
+</body>
+
+</html>
