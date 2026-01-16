@@ -167,7 +167,7 @@ templates:
         - event: OrganizationAdded(indexed address)
           handler: handleOrganizationAdded
         - event: ExtendedMetadataUpdated(string,string)
-          handler: handleExtendedMetadataUpdated
+          handler: handleAggregatorExtendedMetadataUpdated
       file: ./src/mapping.ts
 
   - kind: ethereum/contract
@@ -195,7 +195,7 @@ templates:
         - event: ProposalAdded(indexed address)
           handler: handleProposalAdded
         - event: ExtendedMetadataUpdated(string,string)
-          handler: handleExtendedMetadataUpdated
+          handler: handleOrganizationExtendedMetadataUpdated
       file: ./src/mapping.ts
 
   - kind: ethereum/contract

@@ -7,13 +7,14 @@ type Aggregator @entity(immutable: false) {
   metadata: String
   metadataURI: String
   creator: Bytes!
+  owner: Bytes!
   createdAt: BigInt!
   organizations: [Organization!]! @derivedFrom(field: "aggregator")
 }
 
 type Organization @entity(immutable: false) {
   id: ID! # Contract Address
-  aggregator: Aggregator!
+  aggregator: Aggregator # Nullable: Organization can be created before linking to Aggregator
   name: String!
   description: String!
   metadata: String
@@ -29,6 +30,7 @@ type UnifiedOneStopShop @entity(immutable: false) {
   # Hierarchy (Nullable because a proposal might exist without metadata initially, or vice versa)
   organization: Organization
   metadataContract: Bytes # Address of the metadata contract
+  owner: Bytes # Owner of the proposal metadata contract
 
   # Metadata
   title: String!

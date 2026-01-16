@@ -109,6 +109,9 @@ export function handleAggregatorCreated(event: AggregatorMetadataCreated): void 
     let uCall = contract.try_metadataURI()
     entity.metadataURI = !uCall.reverted ? uCall.value : ""
 
+    let oCall = contract.try_owner()
+    entity.owner = !oCall.reverted ? oCall.value : event.transaction.from
+
     entity.save()
 }
 
@@ -314,6 +317,9 @@ function populateUnifiedEntityFromMetadata(tradingProposalId: Address, metadataA
 
     let uCall = contract.try_metadataURI()
     entity.metadataURI = !uCall.reverted ? uCall.value : ""
+
+    let ownerCall = contract.try_owner()
+    entity.owner = !ownerCall.reverted ? ownerCall.value : null
 
     // 5. REGISTRY: Always fetch Tokens & Pools (Treat Metadata as primary source)
     let tradeContract = FutarchyProposal.bind(tradingProposalId)
