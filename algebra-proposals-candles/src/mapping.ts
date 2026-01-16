@@ -150,6 +150,8 @@ export function handlePoolCreated(event: PoolCreated): void {
     pool.tick = BigInt.fromI32(0)
     pool.isInverted = false
     pool.price = BigDecimal.fromString("0")
+    pool.volumeToken0 = BigDecimal.fromString("0")
+    pool.volumeToken1 = BigDecimal.fromString("0")
 
 
     // NORMALIZATION CHECK
@@ -342,6 +344,14 @@ export function handleSwap(event: SwapEvent): void {
     // UPDATE POOL LATEST PRICE
     pool.sqrtPrice = event.params.price
     pool.price = priceUser
+
+    // --- VOLUME CALCULATION ---
+    let amount0Abs = event.params.amount0.abs().toBigDecimal().div(pow0)
+    let amount1Abs = event.params.amount1.abs().toBigDecimal().div(pow1)
+
+    pool.volumeToken0 = pool.volumeToken0.plus(amount0Abs)
+    pool.volumeToken1 = pool.volumeToken1.plus(amount1Abs)
+
     pool.save()
 
 
@@ -400,7 +410,7 @@ export function handleSwap(event: SwapEvent): void {
 
     for (let i = 0; i < CANDLE_PERIODS.length; i++) {
         let period = CANDLE_PERIODS[i]
-        updateCandle(poolId, timestamp, priceUser, event.block.number, period)
+        updateCandle(poolId, timestamp, priceUser, event.block.number, period, amount0Abs, amount1Abs)
     }
 }
 
@@ -420,7 +430,7 @@ export function handleBurn(event: BurnEvent): void {
     }
 }
 
-function updateCandle(poolId: string, timestamp: BigInt, price: BigDecimal, blockNumber: BigInt, period: i32): void {
+function updateCandle(poolId: string, timestamp: BigInt, price: BigDecimal, blockNumber: BigInt, period: i32, vol0: BigDecimal, vol1: BigDecimal): void {
     let periodStartUnix = (timestamp.toI32() / period) * period
     let candleId = poolId.concat("-").concat(period.toString()).concat("-").concat(periodStartUnix.toString())
 
@@ -436,13 +446,15 @@ function updateCandle(poolId: string, timestamp: BigInt, price: BigDecimal, bloc
         candle.high = price
         candle.low = price
         candle.close = price
-        candle.volumeToken0 = BigDecimal.fromString("0")
-        candle.volumeToken1 = BigDecimal.fromString("0")
+        candle.volumeToken0 = vol0
+        candle.volumeToken1 = vol1
         candle.volumeUSD = BigDecimal.fromString("0")
     } else {
         if (price.gt(candle.high)) candle.high = price
         if (price.lt(candle.low)) candle.low = price
         candle.close = price
+        candle.volumeToken0 = candle.volumeToken0.plus(vol0)
+        candle.volumeToken1 = candle.volumeToken1.plus(vol1)
     }
 
     candle.save()

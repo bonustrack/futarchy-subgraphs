@@ -405,6 +405,32 @@ export class Pool extends Entity {
     }
   }
 
+  get volumeToken0(): BigDecimal {
+    let value = this.get("volumeToken0");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toBigDecimal();
+    }
+  }
+
+  set volumeToken0(value: BigDecimal) {
+    this.set("volumeToken0", Value.fromBigDecimal(value));
+  }
+
+  get volumeToken1(): BigDecimal {
+    let value = this.get("volumeToken1");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toBigDecimal();
+    }
+  }
+
+  set volumeToken1(value: BigDecimal) {
+    this.set("volumeToken1", Value.fromBigDecimal(value));
+  }
+
   get candles(): CandleLoader {
     return new CandleLoader("Pool", this.get("id")!.toString(), "candles");
   }

@@ -38,6 +38,10 @@ type Pool @entity {
   type: String! # "STANDARD", "CONDITIONAL", "PREDICTION"
   outcomeSide: String # "YES", "NO"
 
+  # Volume
+  volumeToken0: BigDecimal!
+  volumeToken1: BigDecimal!
+
 
   # Relations
   candles: [Candle!]! @derivedFrom(field: "pool")
