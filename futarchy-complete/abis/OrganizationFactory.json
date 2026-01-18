@@ -5,6 +5,11 @@
                 "internalType": "address",
                 "name": "_implementation",
                 "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "_proposalImplementation",
+                "type": "address"
             }
         ],
         "stateMutability": "nonpayable",
@@ -87,6 +92,19 @@
     {
         "inputs": [],
         "name": "implementation",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "proposalImplementation",
         "outputs": [
             {
                 "internalType": "address",

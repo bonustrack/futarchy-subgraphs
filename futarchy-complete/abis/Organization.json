@@ -370,6 +370,11 @@
                 "internalType": "string",
                 "name": "_metadataURI",
                 "type": "string"
+            },
+            {
+                "internalType": "address",
+                "name": "_proposalImplementation",
+                "type": "address"
             }
         ],
         "name": "initialize",
