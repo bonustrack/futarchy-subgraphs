@@ -5,8 +5,8 @@ import { FutarchyProposal } from "../generated/FutarchyFactory/FutarchyProposal"
 import { AggregatorMetadataCreated } from "../generated/Creator/Creator"
 import { OrganizationMetadataCreated } from "../generated/OrganizationFactory/OrganizationFactory"
 import { ProposalMetadataCreated } from "../generated/ProposalMetadataFactory/ProposalMetadataFactory"
-import { OrganizationAdded, OrganizationCreatedAndAdded, AggregatorInfoUpdated, ExtendedMetadataUpdated as AggregatorExtendedMetadataUpdated, EditorSet as AggregatorEditorSet, EditorRevoked as AggregatorEditorRevoked } from "../generated/templates/AggregatorTemplate/Aggregator"
-import { ProposalAdded, ProposalCreatedAndAdded, CompanyInfoUpdated, ExtendedMetadataUpdated as OrganizationExtendedMetadataUpdated, EditorSet as OrganizationEditorSet, EditorRevoked as OrganizationEditorRevoked } from "../generated/templates/OrganizationTemplate/Organization"
+import { OrganizationAdded, OrganizationCreatedAndAdded, AggregatorInfoUpdated, ExtendedMetadataUpdated as AggregatorExtendedMetadataUpdated, EditorSet as AggregatorEditorSet, EditorRevoked as AggregatorEditorRevoked, OrganizationRemoved } from "../generated/templates/AggregatorTemplate/Aggregator"
+import { ProposalAdded, ProposalCreatedAndAdded, CompanyInfoUpdated, ExtendedMetadataUpdated as OrganizationExtendedMetadataUpdated, EditorSet as OrganizationEditorSet, EditorRevoked as OrganizationEditorRevoked, ProposalRemoved } from "../generated/templates/OrganizationTemplate/Organization"
 import { MetadataUpdated, Proposal as MetadataContract, ExtendedMetadataUpdated as ProposalExtendedMetadataUpdated } from "../generated/templates/ProposalTemplate/Proposal"
 // import { Swap } from "../generated/templates/AlgebraPool/AlgebraPool"
 import { ERC20 } from "../generated/FutarchyFactory/ERC20"
@@ -350,6 +350,37 @@ export function handleOrganizationEditorRevoked(event: OrganizationEditorRevoked
     let entity = Organization.load(event.address.toHexString())
     if (entity) {
         entity.editor = null
+        entity.save()
+    }
+}
+
+export function handleProposalRemoved(event: ProposalRemoved): void {
+    let metadataAddr = event.params.proposalMetadata
+
+    // We need to find the Trading Proposal ID to unlink it
+    let contract = MetadataContract.bind(metadataAddr)
+    let addrCall = contract.try_proposalAddress()
+
+    // If we can't get the address, we can't find the entity to update
+    if (addrCall.reverted) {
+        log.warning("handleProposalRemoved: Could not fetch proposal address for metadata {}", [metadataAddr.toHexString()])
+        return
+    }
+
+    let tradingProposalId = addrCall.value
+    let entity = getOrCreateUnifiedEntity(tradingProposalId)
+
+    // Unlink
+    entity.organization = null
+    entity.save()
+}
+
+export function handleOrganizationRemoved(event: OrganizationRemoved): void {
+    let orgId = event.params.organizationMetadata.toHexString()
+    let entity = Organization.load(orgId)
+
+    if (entity) {
+        entity.aggregator = null
         entity.save()
     }
 }
