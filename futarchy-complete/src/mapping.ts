@@ -5,8 +5,8 @@ import { FutarchyProposal } from "../generated/FutarchyFactory/FutarchyProposal"
 import { AggregatorMetadataCreated } from "../generated/Creator/Creator"
 import { OrganizationMetadataCreated } from "../generated/OrganizationFactory/OrganizationFactory"
 import { ProposalMetadataCreated } from "../generated/ProposalMetadataFactory/ProposalMetadataFactory"
-import { OrganizationAdded, AggregatorInfoUpdated, ExtendedMetadataUpdated as AggregatorExtendedMetadataUpdated } from "../generated/templates/AggregatorTemplate/Aggregator"
-import { ProposalAdded, CompanyInfoUpdated, ExtendedMetadataUpdated as OrganizationExtendedMetadataUpdated } from "../generated/templates/OrganizationTemplate/Organization"
+import { OrganizationAdded, OrganizationCreatedAndAdded, AggregatorInfoUpdated, ExtendedMetadataUpdated as AggregatorExtendedMetadataUpdated, EditorSet as AggregatorEditorSet, EditorRevoked as AggregatorEditorRevoked } from "../generated/templates/AggregatorTemplate/Aggregator"
+import { ProposalAdded, ProposalCreatedAndAdded, CompanyInfoUpdated, ExtendedMetadataUpdated as OrganizationExtendedMetadataUpdated, EditorSet as OrganizationEditorSet, EditorRevoked as OrganizationEditorRevoked } from "../generated/templates/OrganizationTemplate/Organization"
 import { MetadataUpdated, Proposal as MetadataContract, ExtendedMetadataUpdated as ProposalExtendedMetadataUpdated } from "../generated/templates/ProposalTemplate/Proposal"
 // import { Swap } from "../generated/templates/AlgebraPool/AlgebraPool"
 import { ERC20 } from "../generated/FutarchyFactory/ERC20"
@@ -257,6 +257,101 @@ export function handleProposalExtendedMetadataUpdated(event: ProposalExtendedMet
     entity.metadata = event.params.metadata
     entity.metadataURI = event.params.metadataURI
     entity.save()
+}
+
+// ============================================
+// NEW: OrganizationCreatedAndAdded & ProposalCreatedAndAdded HANDLERS
+// ============================================
+
+export function handleOrganizationCreatedAndAdded(event: OrganizationCreatedAndAdded): void {
+    let orgId = event.params.organizationMetadata.toHexString()
+    let aggregatorId = event.address.toHexString()
+
+    // Create Template
+    OrganizationTemplate.create(event.params.organizationMetadata)
+
+    // Load or create Organization
+    let entity = Organization.load(orgId)
+    if (entity == null) {
+        entity = new Organization(orgId)
+        entity.createdAt = event.block.timestamp
+    }
+
+    entity.name = event.params.companyName
+    entity.aggregator = aggregatorId
+
+    // Fetch additional details
+    let contract = OrganizationContract.bind(event.params.organizationMetadata)
+    let dCall = contract.try_description()
+    entity.description = !dCall.reverted ? dCall.value : ""
+
+    let oCall = contract.try_owner()
+    entity.owner = !oCall.reverted ? oCall.value : event.transaction.from
+
+    let eCall = contract.try_editor()
+    entity.editor = !eCall.reverted ? eCall.value : null
+
+    let mCall = contract.try_metadata()
+    entity.metadata = !mCall.reverted ? mCall.value : ""
+
+    let uCall = contract.try_metadataURI()
+    entity.metadataURI = !uCall.reverted ? uCall.value : ""
+
+    entity.save()
+}
+
+export function handleProposalCreatedAndAdded(event: ProposalCreatedAndAdded): void {
+    let metadataAddr = event.params.proposalMetadata
+    let tradingProposalAddr = event.params.proposalAddress
+    let orgId = event.address.toHexString()
+
+    // Create Template
+    ProposalTemplate.create(metadataAddr)
+
+    // Populate Unified Entity with organization link
+    let entity = getOrCreateUnifiedEntity(tradingProposalAddr)
+    entity.organization = orgId
+    entity.metadataContract = metadataAddr
+    entity.save()
+
+    // Populate from metadata
+    populateUnifiedEntityFromMetadata(tradingProposalAddr, metadataAddr)
+}
+
+// ============================================
+// NEW: EDITOR HANDLERS
+// ============================================
+
+export function handleAggregatorEditorSet(event: AggregatorEditorSet): void {
+    let entity = Aggregator.load(event.address.toHexString())
+    if (entity) {
+        entity.editor = event.params.newEditor
+        entity.save()
+    }
+}
+
+export function handleAggregatorEditorRevoked(event: AggregatorEditorRevoked): void {
+    let entity = Aggregator.load(event.address.toHexString())
+    if (entity) {
+        entity.editor = null
+        entity.save()
+    }
+}
+
+export function handleOrganizationEditorSet(event: OrganizationEditorSet): void {
+    let entity = Organization.load(event.address.toHexString())
+    if (entity) {
+        entity.editor = event.params.newEditor
+        entity.save()
+    }
+}
+
+export function handleOrganizationEditorRevoked(event: OrganizationEditorRevoked): void {
+    let entity = Organization.load(event.address.toHexString())
+    if (entity) {
+        entity.editor = null
+        entity.save()
+    }
 }
 
 

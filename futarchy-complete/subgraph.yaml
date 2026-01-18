@@ -9,7 +9,7 @@ dataSources:
     source:
       address: "0xa6cB18FCDC17a2B44E5cAd2d80a6D5942d30a345"
       abi: FutarchyFactory
-      startBlock: 43957938
+      startBlock: 44225271
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -37,7 +37,7 @@ dataSources:
     source:
       address: "0xA0864cCA6E114013AB0e27cbd5B6f4c8947da766"
       abi: AlgebraFactory
-      startBlock: 43957938
+      startBlock: 44225271
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -63,9 +63,9 @@ dataSources:
     name: Creator
     network: gnosis
     source:
-      address: "0x8ffCf8546DE700FB2Ceab4709fB26ee05A19652B"
+      address: "0xB120358180c09B0aC3b5A908c9E01D84F6266482"
       abi: Creator
-      startBlock: 43957938
+      startBlock: 44225271
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -87,9 +87,9 @@ dataSources:
     name: OrganizationFactory
     network: gnosis
     source:
-      address: "0x2Fa9318E1e29d7435EE9d23B687b10a9CDDD0d9e"
+      address: "0x08e31d771031711263b13A01D2dBb518f43Ef3f4"
       abi: OrganizationFactory
-      startBlock: 43957938
+      startBlock: 44225271
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -111,9 +111,9 @@ dataSources:
     name: ProposalMetadataFactory
     network: gnosis
     source:
-      address: "0x8E8DBe97B2B3B6fb77F30727F3dCcA085C9755D9"
+      address: "0xE518ea78F743fcC41fEad0f92C1792A0aD7999E3"
       abi: ProposalMetadataFactory
-      startBlock: 43957938
+      startBlock: 44225271
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -166,8 +166,14 @@ templates:
       eventHandlers:
         - event: OrganizationAdded(indexed address)
           handler: handleOrganizationAdded
+        - event: OrganizationCreatedAndAdded(indexed address,string)
+          handler: handleOrganizationCreatedAndAdded
         - event: ExtendedMetadataUpdated(string,string)
           handler: handleAggregatorExtendedMetadataUpdated
+        - event: EditorSet(indexed address)
+          handler: handleAggregatorEditorSet
+        - event: EditorRevoked(indexed address)
+          handler: handleAggregatorEditorRevoked
       file: ./src/mapping.ts
 
   - kind: ethereum/contract
@@ -194,8 +200,14 @@ templates:
       eventHandlers:
         - event: ProposalAdded(indexed address)
           handler: handleProposalAdded
+        - event: ProposalCreatedAndAdded(indexed address,indexed address)
+          handler: handleProposalCreatedAndAdded
         - event: ExtendedMetadataUpdated(string,string)
           handler: handleOrganizationExtendedMetadataUpdated
+        - event: EditorSet(indexed address)
+          handler: handleOrganizationEditorSet
+        - event: EditorRevoked(indexed address)
+          handler: handleOrganizationEditorRevoked
       file: ./src/mapping.ts
 
   - kind: ethereum/contract

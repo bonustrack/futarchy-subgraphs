@@ -8,6 +8,7 @@ type Aggregator @entity(immutable: false) {
   metadataURI: String
   creator: Bytes!
   owner: Bytes!
+  editor: Bytes # Nullable: Editor role for delegated operations
   createdAt: BigInt!
   organizations: [Organization!]! @derivedFrom(field: "aggregator")
 }
@@ -20,6 +21,7 @@ type Organization @entity(immutable: false) {
   metadata: String
   metadataURI: String
   owner: Bytes!
+  editor: Bytes # Nullable: Editor role for delegated operations
   createdAt: BigInt!
   proposals: [UnifiedOneStopShop!]! @derivedFrom(field: "organization")
 }
@@ -31,6 +33,7 @@ type UnifiedOneStopShop @entity(immutable: false) {
   organization: Organization
   metadataContract: Bytes # Address of the metadata contract
   owner: Bytes # Owner of the proposal metadata contract
+  editor: Bytes # Nullable: Editor role for delegated operations
 
   # Metadata
   title: String!
