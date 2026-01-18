@@ -1,0 +1,123 @@
+{
+  "address": "0xCF3d0A6d7d85639fb012fA711Fef7286e6Db2808",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_implementation",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_proposalImplementation",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "FailedDeployment",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "balance",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "needed",
+          "type": "uint256"
+        }
+      ],
+      "name": "InsufficientBalance",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "metadata",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "name",
+          "type": "string"
+        }
+      ],
+      "name": "OrganizationMetadataCreated",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "companyName",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "metadata",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "metadataURI",
+          "type": "string"
+        }
+      ],
+      "name": "createOrganizationMetadata",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "implementation",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "proposalImplementation",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x60c03461008757601f6104d338819003918201601f19168301916001600160401b0383118484101761008c57808492604094855283398101031261008757610052602061004b836100a2565b92016100a2565b9060805260a05260405161041c90816100b7823960805181818160c301526102b6015260a0518181816101ad01526102f90152f35b600080fd5b634e487b7160e01b600052604160045260246000fd5b51906001600160a01b03821682036100875756fe60806040908082526004918236101561001757600080fd5b600091823560e01c90816346916237146102e5575080635c60da1b146102a2576381b61ea31461004657600080fd5b3461029b576003199160803684011261029f5767ffffffffffffffff90843582811161029b576100799036908701610328565b91602435818111610297576100919036908801610328565b94604435828111610293576100a99036908901610328565b9060643583811161028f576100c19036908a01610328565b7f0000000000000000000000000000000000000000000000000000000000000000608881901c62ffffff16763d602d80600a3d3981f3363d3d373d3d3d363d7300000017865260781b6e5af43d82803e903d91602b57fd5bf3176020526001600160a01b0392836037600988f01698891561027f57893b1561027b57936101aa87969594899461019b8e9561018b61017b9c998f519d8e9a8b9a632434685560e01b8c5233908c015260c060248c015260c48b01906103a6565b90868a83030160448b01526103a6565b90848883030160648901526103a6565b918583030160848601526103a6565b907f00000000000000000000000000000000000000000000000000000000000000001660a48301520381838a5af1801561027157610227575b60208686817f5a22cd29dede3c1979f1ed69f9bf4eaa4680a02aa7fd4b4eceedcb020b8030ef61021e898451918291888352888301906103a6565b0390a251908152f35b821161025e57508252602093507f5a22cd29dede3c1979f1ed69f9bf4eaa4680a02aa7fd4b4eceedcb020b8030ef61021e846101e3565b634e487b7160e01b815260418652602490fd5b85513d84823e3d90fd5b8680fd5b885163b06ebf3d60e01b81528b90fd5b8480fd5b8380fd5b8280fd5b5080fd5b80fd5b503461029b578160031936011261029b57517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b83903461029b578160031936011261029b577f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b81601f8201121561038b5780359067ffffffffffffffff928383116103905760405193601f8401601f19908116603f0116850190811185821017610390576040528284526020838301011161038b57816000926020809301838601378301015290565b600080fd5b634e487b7160e01b600052604160045260246000fd5b919082519283825260005b8481106103d2575050826000602080949584010152601f8019910116010190565b6020818301810151848301820152016103b156fea26469706673582212209b2f682940c19c7e47ba3915300ecf73404272a705cc488aacf701e9747b046d64736f6c63430008140033",
+  "network": "hardhat"
+}

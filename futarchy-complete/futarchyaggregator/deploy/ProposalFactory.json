@@ -1,0 +1,115 @@
+{
+  "address": "0x899c70C37E523C99Bd61993ca434F1c1A82c106d",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_implementation",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "FailedDeployment",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "balance",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "needed",
+          "type": "uint256"
+        }
+      ],
+      "name": "InsufficientBalance",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "metadata",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "proposalAddress",
+          "type": "address"
+        }
+      ],
+      "name": "ProposalMetadataCreated",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "proposalAddress",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "displayNameQuestion",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "displayNameEvent",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "metadata",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "metadataURI",
+          "type": "string"
+        }
+      ],
+      "name": "createProposalMetadata",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "implementation",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x60a03461007057601f61046338819003918201601f19168301916001600160401b038311848410176100755780849260209460405283398101031261007057516001600160a01b0381168103610070576080526040516103d7908161008c823960805181818160f701526102b40152f35b600080fd5b634e487b7160e01b600052604160045260246000fdfe608060409080825260048036101561001657600080fd5b600091823560e01c9081635c60da1b146102a0575063b0ccc02e1461003a57600080fd5b3461029c576003199060c036830112610298576001600160a01b039181358381169291908390036102945767ffffffffffffffff6024358181116102905761008590369085016102e3565b9160443582811161028c5761009d90369086016102e3565b95606435838111610288576100b590369087016102e3565b608435848111610284576100cc90369088016102e3565b9060a435858111610270576100e490369089016102e3565b926e5af43d82803e903d91602b57fd5bf37f0000000000000000000000000000000000000000000000000000000000000000763d602d80600a3d3981f3363d3d373d3d3d363d7300000062ffffff8260881c16178d5260781b17602052603760098cf01698891561027457893b15610270579388936101cb89946101bb8f958f996101ab9061019b6101da99519e8f9c8d809d633477a8d760e21b82523391015260248d015260e060448d015260e48c0190610361565b90888b83030160648c0152610361565b90868983030160848a0152610361565b90848783030160a4880152610361565b918483030160c4850152610361565b038183895af180156102665761021b575b505050817fbe81e9bac19820773de638e28f30ed41d447a4ba705c869ef4a3ed8dd3cf3a14602095519480a38152f35b819695929611610253578452929350817fbe81e9bac19820773de638e28f30ed41d447a4ba705c869ef4a3ed8dd3cf3a1460206101eb565b634e487b7160e01b825260418652602482fd5b87513d88823e3d90fd5b8a80fd5b8b5163b06ebf3d60e01b81528890fd5b8980fd5b8880fd5b8780fd5b8680fd5b8480fd5b8280fd5b5080fd5b83903461029c578160031936011261029c577f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b81601f820112156103465780359067ffffffffffffffff9283831161034b5760405193601f8401601f19908116603f011685019081118582101761034b576040528284526020838301011161034657816000926020809301838601378301015290565b600080fd5b634e487b7160e01b600052604160045260246000fd5b919082519283825260005b84811061038d575050826000602080949584010152601f8019910116010190565b60208183018101518483018201520161036c56fea26469706673582212201d42ea2783c199380b32ea2f45c7cc79423c0f69b6284c66d9a2c0211d050a7564736f6c63430008140033",
+  "network": "hardhat"
+}

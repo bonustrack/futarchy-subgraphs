@@ -212,6 +212,19 @@
         "type": "event"
     },
     {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "implementation",
+                "type": "address"
+            }
+        ],
+        "name": "ProposalImplementationSet",
+        "type": "event"
+    },
+    {
         "inputs": [
             {
                 "internalType": "address",
@@ -360,6 +373,16 @@
                 "internalType": "string",
                 "name": "_metadataURI",
                 "type": "string"
+            },
+            {
+                "internalType": "address",
+                "name": "_organizationImplementation",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "_proposalImplementation",
+                "type": "address"
             }
         ],
         "name": "initialize",
@@ -439,6 +462,19 @@
         "type": "function"
     },
     {
+        "inputs": [],
+        "name": "proposalImplementation",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
         "inputs": [
             {
                 "internalType": "uint256",
@@ -487,6 +523,19 @@
             }
         ],
         "name": "setOrganizationImplementation",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_implementation",
+                "type": "address"
+            }
+        ],
+        "name": "setProposalImplementation",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"

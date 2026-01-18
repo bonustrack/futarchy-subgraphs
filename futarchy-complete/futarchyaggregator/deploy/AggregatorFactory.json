@@ -1,0 +1,141 @@
+{
+  "address": "0xe7C27c932C80D30c9aaA30A856c0062208d269b4",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_implementation",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_organizationImplementation",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_proposalImplementation",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "FailedDeployment",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "balance",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "needed",
+          "type": "uint256"
+        }
+      ],
+      "name": "InsufficientBalance",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "metadata",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "name",
+          "type": "string"
+        }
+      ],
+      "name": "AggregatorMetadataCreated",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "aggregatorName",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "metadata",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "metadataURI",
+          "type": "string"
+        }
+      ],
+      "name": "createAggregatorMetadata",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "implementation",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "organizationImplementation",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "proposalImplementation",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x60e0346100a857601f61056a38819003918201601f19168301916001600160401b038311848410176100ad578084926060946040528339810103126100a857610047816100c3565b906100606040610059602084016100c3565b92016100c3565b9160805260a05260c05260405161049290816100d8823960805181818160ce01526102e9015260a0518181816101b9015261036f015260c0518181816101e0015261032c0152f35b600080fd5b634e487b7160e01b600052604160045260246000fd5b51906001600160a01b03821682036100a85756fe60806040908082526004918236101561001757600080fd5b600091823560e01c90816315eb78e31461035b5750806346916237146103185780635c60da1b146102d557636aabbc801461005157600080fd5b346102ce57600319916080368401126102d25767ffffffffffffffff9084358281116102ce57610084903690870161039e565b916024358181116102ca5761009c903690880161039e565b946044358281116102c6576100b4903690890161039e565b906064358381116102c2576100cc9036908a0161039e565b7f0000000000000000000000000000000000000000000000000000000000000000608881901c62ffffff16763d602d80600a3d3981f3363d3d373d3d3d363d7300000017865260781b6e5af43d82803e903d91602b57fd5bf3176020526001600160a01b0392836037600988f0169889156102b257893b156102ae57936101b58796959489946101a68e956101966101869c998f519d8e9a8b9a63b56d435760e01b8c5233908c015260e060248c015260e48b019061041c565b90868a83030160448b015261041c565b908488830301606489015261041c565b9185830301608486015261041c565b90807f00000000000000000000000000000000000000000000000000000000000000001660a48401527f00000000000000000000000000000000000000000000000000000000000000001660c48301520381838a5af180156102a45761025a575b60208686817f0a3c43915185e71e6bed1f101e1fff088965425ff41e99aae4bd6a47a0ff4f1e6102518984519182918883528883019061041c565b0390a251908152f35b821161029157508252602093507f0a3c43915185e71e6bed1f101e1fff088965425ff41e99aae4bd6a47a0ff4f1e61025184610216565b634e487b7160e01b815260418652602490fd5b85513d84823e3d90fd5b8680fd5b885163b06ebf3d60e01b81528b90fd5b8480fd5b8380fd5b8280fd5b5080fd5b80fd5b50346102ce57816003193601126102ce57517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b50346102ce57816003193601126102ce57517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b8390346102ce57816003193601126102ce577f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b81601f820112156104015780359067ffffffffffffffff928383116104065760405193601f8401601f19908116603f0116850190811185821017610406576040528284526020838301011161040157816000926020809301838601378301015290565b600080fd5b634e487b7160e01b600052604160045260246000fd5b919082519283825260005b848110610448575050826000602080949584010152601f8019910116010190565b60208183018101518483018201520161042756fea264697066735822122084d0e105d1a06aa1c537f7515d0351a010df5c30ff7e870590dbc2ddbacb4ede64736f6c63430008140033",
+  "network": "hardhat"
+}

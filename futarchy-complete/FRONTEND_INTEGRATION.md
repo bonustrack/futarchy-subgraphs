@@ -10,9 +10,9 @@
 
 | Contract | Address |
 |----------|---------|
-| **Aggregator Factory** | [`0xB6DCc90C13414488557205Af65fe7bf59862a5D5`](https://gnosisscan.io/address/0xB6DCc90C13414488557205Af65fe7bf59862a5D5) |
-| **Organization Factory** | [`0xD573Db1606b4D385E498dB65B584a4bdF2B61F86`](https://gnosisscan.io/address/0xD573Db1606b4D385E498dB65B584a4bdF2B61F86) |
-| **Proposal Metadata Factory** | [`0x19A4780243F0d72A8d6EF788652c19AC199B3BFd`](https://gnosisscan.io/address/0x19A4780243F0d72A8d6EF788652c19AC199B3BFd) |
+| **Aggregator Factory** | [`0xe7C27c932C80D30c9aaA30A856c0062208d269b4`](https://gnosisscan.io/address/0xe7C27c932C80D30c9aaA30A856c0062208d269b4) |
+| **Organization Factory** | [`0xCF3d0A6d7d85639fb012fA711Fef7286e6Db2808`](https://gnosisscan.io/address/0xCF3d0A6d7d85639fb012fA711Fef7286e6Db2808) |
+| **Proposal Metadata Factory** | [`0x899c70C37E523C99Bd61993ca434F1c1A82c106d`](https://gnosisscan.io/address/0x899c70C37E523C99Bd61993ca434F1c1A82c106d) |
 
 ---
 

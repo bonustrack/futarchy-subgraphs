@@ -1,0 +1,8 @@
+{
+  "aggregatorFactory": "0xe7C27c932C80D30c9aaA30A856c0062208d269b4",
+  "organizationFactory": "0xCF3d0A6d7d85639fb012fA711Fef7286e6Db2808",
+  "proposalFactory": "0x899c70C37E523C99Bd61993ca434F1c1A82c106d",
+  "aggregatorImplementation": "0x7dA4DC7c7B941f863ae72ebc86546D3dC9922fe4",
+  "organizationImplementation": "0x2AcD9F4079faE754a26f820B01Ca29A1B4EF0f9d",
+  "proposalImplementation": "0x37b4E4672200d145AB68a5aD650BCaC8b4a5eAEF"
+}
