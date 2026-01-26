@@ -1,0 +1,66 @@
+- Apply migrations
+  [90mSkip migration: Bump mapping apiVersion from 0.0.1 to 0.0.2[39m
+- Apply migrations
+  [90mSkip migration: Bump mapping apiVersion from 0.0.2 to 0.0.3[39m
+- Apply migrations
+  [90mSkip migration: Bump mapping apiVersion from 0.0.3 to 0.0.4[39m
+- Apply migrations
+  [90mSkip migration: Bump mapping apiVersion from 0.0.4 to 0.0.5[39m
+- Apply migrations
+  [90mSkip migration: Bump mapping apiVersion from 0.0.5 to 0.0.6[39m
+- Apply migrations
+  [90mSkip migration: Bump manifest specVersion from 0.0.1 to 0.0.2[39m
+- Apply migrations
+  [90mSkip migration: Bump manifest specVersion from 0.0.2 to 0.0.4[39m
+- Apply migrations
+√ Apply migrations
+- Load subgraph from subgraph.yaml
+√ Load subgraph from subgraph.yaml
+- Compile subgraph
+  [90mCompile data source: Creator => build\Creator\Creator.wasm[39m
+- Compile subgraph
+
+▌ Whoops, the AssemblyScript compiler has crashed during compile :-(
+▌ 
+▌ Here is the stack trace hinting at the problem, perhaps it's useful?
+▌ 
+▌ AssertionError: assertion failed
+▌     at i.assert (C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\assemblyscript\dist\assemblyscript.js:7:765506)
+▌     at f.compileBinaryOverload (C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\assemblyscript\dist\assemblyscript.js:7:280159)
+▌     at f.compileBinaryExpression (C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\assemblyscript\dist\assemblyscript.js:7:254896)
+▌     at f.compileExpression (C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\assemblyscript\dist\assemblyscript.js:7:245493)
+▌     at f.compileIfStatement (C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\assemblyscript\dist\assemblyscript.js:7:236460)
+▌     at f.compileStatement (C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\assemblyscript\dist\assemblyscript.js:7:230864)
+▌     at f.compileStatements (C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\assemblyscript\dist\assemblyscript.js:7:231714)
+▌     at f.compileFunctionBody (C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\assemblyscript\dist\assemblyscript.js:7:220856)
+▌     at f.compileFunction (C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\assemblyscript\dist\assemblyscript.js:7:219868)
+▌     at f.makeCallDirect (C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\assemblyscript\dist\assemblyscript.js:7:300516)
+▌ 
+▌ If it refers to the dist files, try to 'npm install source-map-support' and
+▌ run again, which should then show the actual code location in the sources.
+▌ 
+▌ If you see where the error is, feel free to send us a pull request. If not,
+▌ please let us know: https://github.com/AssemblyScript/assemblyscript/issues
+▌ 
+▌ Thank you!
+
+× Failed to compile subgraph: Failed to compile data source mapping: The AssemblyScript compiler crashed when compiling this file: 'src\mapping.ts'
+Suggestion: try to comment the whole file and uncomment it little by little while re-running the graph-cli until you isolate the line where the problem happens.
+Also, please contact us so we can make the CLI better by handling errors like this. You can reach out in any of these links:
+- Discord channel: https://discord.gg/eM8CA6WA9r
+- Github issues: https://github.com/graphprotocol/graph-tooling/issues/new/choose
+[31mError: Failed to compile data source mapping: The AssemblyScript compiler crashed when compiling this file: 'src\mapping.ts'[39m
+[31mSuggestion: try to comment the whole file and uncomment it little by little while re-running the graph-cli until you isolate the line where the problem happens.[39m
+[31mAlso, please contact us so we can make the CLI better by handling errors like this. You can reach out in any of these links:[39m
+[31m- Discord channel: https://discord.gg/eM8CA6WA9r[39m
+[31m- Github issues: https://github.com/graphprotocol/graph-tooling/issues/new/choose[39m
+[31m    at Compiler._compileDataSourceMapping (C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\@graphprotocol\graph-cli\dist\compiler\index.js:297:19)[39m
+[31m    at C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\@graphprotocol\graph-cli\dist\compiler\index.js:201:167[39m
+[31m    at updateInDeeply (C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\immutable\dist\immutable.js:2121:22)[39m
+[31m    at updateInDeeply (C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\immutable\dist\immutable.js:2134:23)[39m
+[31m    at updateInDeeply (C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\immutable\dist\immutable.js:2134:23)[39m
+[31m    at updateIn$1 (C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\immutable\dist\immutable.js:2099:24)[39m
+[31m    at Map.updateIn (C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\immutable\dist\immutable.js:2180:12)[39m
+[31m    at C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\@graphprotocol\graph-cli\dist\compiler\index.js:201:115[39m
+[31m    at C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\immutable\dist\immutable.js:3321:30[39m
+[31m    at List.withMutations (C:\Users\arthd\Documents\GitHub\futarchy-subgraphs\futarchy-complete\node_modules\immutable\dist\immutable.js:2367:5)[39m

@@ -1,0 +1,65 @@
+- Apply migrations
+  [90mSkip migration: Bump mapping apiVersion from 0.0.1 to 0.0.2[39m
+- Apply migrations
+  [90mSkip migration: Bump mapping apiVersion from 0.0.2 to 0.0.3[39m
+- Apply migrations
+  [90mSkip migration: Bump mapping apiVersion from 0.0.3 to 0.0.4[39m
+- Apply migrations
+  [90mSkip migration: Bump mapping apiVersion from 0.0.4 to 0.0.5[39m
+- Apply migrations
+  [90mSkip migration: Bump mapping apiVersion from 0.0.5 to 0.0.6[39m
+- Apply migrations
+  [90mSkip migration: Bump manifest specVersion from 0.0.1 to 0.0.2[39m
+- Apply migrations
+  [90mSkip migration: Bump manifest specVersion from 0.0.2 to 0.0.4[39m
+- Apply migrations
+√ Apply migrations
+- Load subgraph from subgraph.yaml
+√ Load subgraph from subgraph.yaml
+- Compile subgraph
+  [90mCompile data source: Creator => build\Creator\Creator.wasm[39m
+- Compile subgraph
+  [90mCompile data source: OrganizationFactory => build\Creator\Creator.wasm (already compiled)[39m
+- Compile subgraph
+  [90mCompile data source: ProposalMetadataFactory => build\Creator\Creator.wasm (already compiled)[39m
+- Compile subgraph
+  [90mCompile data source template: AggregatorTemplate => build\Creator\Creator.wasm (already compiled)[39m
+- Compile subgraph
+  [90mCompile data source template: OrganizationTemplate => build\Creator\Creator.wasm (already compiled)[39m
+- Compile subgraph
+  [90mCompile data source template: ProposalTemplate => build\Creator\Creator.wasm (already compiled)[39m
+- Compile subgraph
+√ Compile subgraph
+- Write compiled subgraph to build\
+  [90mCopy schema file build\schema.graphql[39m
+- Write compiled subgraph to build\
+  [90mWrite subgraph file build\Creator\abis\Creator.json[39m
+- Write compiled subgraph to build\
+  [90mWrite subgraph file build\Creator\abis\Aggregator.json[39m
+- Write compiled subgraph to build\
+  [90mWrite subgraph file build\OrganizationFactory\abis\OrganizationFactory.json[39m
+- Write compiled subgraph to build\
+  [90mWrite subgraph file build\OrganizationFactory\abis\Organization.json[39m
+- Write compiled subgraph to build\
+  [90mWrite subgraph file build\ProposalMetadataFactory\abis\ProposalMetadataFactory.json[39m
+- Write compiled subgraph to build\
+  [90mWrite subgraph file build\ProposalMetadataFactory\abis\Proposal.json[39m
+- Write compiled subgraph to build\
+  [90mWrite subgraph file build\AggregatorTemplate\abis\Aggregator.json[39m
+- Write compiled subgraph to build\
+  [90mWrite subgraph file build\AggregatorTemplate\abis\Organization.json[39m
+- Write compiled subgraph to build\
+  [90mWrite subgraph file build\AggregatorTemplate\abis\Proposal.json[39m
+- Write compiled subgraph to build\
+  [90mWrite subgraph file build\OrganizationTemplate\abis\Organization.json[39m
+- Write compiled subgraph to build\
+  [90mWrite subgraph file build\OrganizationTemplate\abis\Proposal.json[39m
+- Write compiled subgraph to build\
+  [90mWrite subgraph file build\ProposalTemplate\abis\Proposal.json[39m
+- Write compiled subgraph to build\
+  [90mWrite subgraph manifest build\subgraph.yaml[39m
+- Write compiled subgraph to build\
+√ Write compiled subgraph to build\
+
+[32mBuild completed: build\subgraph.yaml[39m
+

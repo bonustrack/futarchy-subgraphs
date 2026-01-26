@@ -2,63 +2,7 @@ specVersion: 0.0.5
 schema:
   file: ./schema.graphql
 dataSources:
-  # 1. Futarchy Factory - Creates the Trading Structure
-  - kind: ethereum
-    name: FutarchyFactory
-    network: gnosis
-    source:
-      address: "0xa6cB18FCDC17a2B44E5cAd2d80a6D5942d30a345"
-      abi: FutarchyFactory
-      startBlock: 44225271
-    mapping:
-      kind: ethereum/events
-      apiVersion: 0.0.7
-      language: wasm/assemblyscript
-      entities:
-        - UnifiedOneStopShop
-      abis:
-        - name: FutarchyFactory
-          file: ./abis/FutarchyFactory.json
-        - name: FutarchyProposal
-          file: ./abis/FutarchyProposal.json
-        - name: AlgebraFactory
-          file: ./abis/AlgebraFactory.json
-        - name: ERC20
-          file: ./abis/ERC20.json
-      eventHandlers:
-        - event: NewProposal(indexed address,string,bytes32,bytes32)
-          handler: handleNewProposal
-      file: ./src/mapping.ts
-
-  # 2. Algebra Factory - Creates the Pools
-  - kind: ethereum
-    name: AlgebraFactory
-    network: gnosis
-    source:
-      address: "0xA0864cCA6E114013AB0e27cbd5B6f4c8947da766"
-      abi: AlgebraFactory
-      startBlock: 44225271
-    mapping:
-      kind: ethereum/events
-      apiVersion: 0.0.7
-      language: wasm/assemblyscript
-      entities:
-        - NormalizedPool
-      abis:
-        - name: AlgebraFactory
-          file: ./abis/AlgebraFactory.json
-        - name: ERC20
-          file: ./abis/ERC20.json
-        - name: Creator
-          file: ./abis/Creator.json
-        - name: Aggregator
-          file: ./abis/Aggregator.json
-      eventHandlers:
-        - event: Pool(indexed address,indexed address,address)
-          handler: handlePoolCreated
-      file: ./src/mapping.ts
-
-  # 3. Aggregator Creator - Starts the Metadata Chain
+  # 1. Aggregator Creator - Starts the Metadata Chain
   - kind: ethereum
     name: Creator
     network: gnosis
@@ -71,7 +15,7 @@ dataSources:
       apiVersion: 0.0.7
       language: wasm/assemblyscript
       entities:
-        - UnifiedOneStopShop
+        - ProposalEntity
       abis:
         - name: Creator
           file: ./abis/Creator.json
@@ -82,7 +26,7 @@ dataSources:
           handler: handleAggregatorCreated
       file: ./src/mapping.ts
 
-  # 4. Organization Factory - Indexes Organizations directly
+  # 2. Organization Factory - Indexes Organizations directly
   - kind: ethereum
     name: OrganizationFactory
     network: gnosis
@@ -106,7 +50,7 @@ dataSources:
           handler: handleOrganizationMetadataCreated
       file: ./src/mapping.ts
 
-  # 5. Proposal Factory - Indexes Proposals directly
+  # 3. Proposal Factory - Indexes Proposals directly
   - kind: ethereum
     name: ProposalMetadataFactory
     network: gnosis
@@ -119,26 +63,18 @@ dataSources:
       apiVersion: 0.0.7
       language: wasm/assemblyscript
       entities:
-        - UnifiedOneStopShop
+        - ProposalEntity
       abis:
         - name: ProposalMetadataFactory
           file: ./abis/ProposalMetadataFactory.json
         - name: Proposal
           file: ./abis/Proposal.json
-        - name: FutarchyProposal
-          file: ./abis/FutarchyProposal.json
-        - name: AlgebraFactory
-          file: ./abis/AlgebraFactory.json
-        - name: ERC20
-          file: ./abis/ERC20.json
       eventHandlers:
         - event: ProposalMetadataCreated(indexed address,indexed address)
           handler: handleProposalMetadataCreated
       file: ./src/mapping.ts
 
 templates:
-
-  
   # Aggregator Hierarchy (To find Proposals)
   - kind: ethereum/contract
     name: AggregatorTemplate
@@ -157,12 +93,6 @@ templates:
           file: ./abis/Organization.json
         - name: Proposal
           file: ./abis/Proposal.json
-        - name: FutarchyProposal
-          file: ./abis/FutarchyProposal.json
-        - name: AlgebraFactory
-          file: ./abis/AlgebraFactory.json
-        - name: ERC20
-          file: ./abis/ERC20.json
       eventHandlers:
         - event: OrganizationAdded(indexed address)
           handler: handleOrganizationAdded
@@ -193,12 +123,6 @@ templates:
           file: ./abis/Organization.json
         - name: Proposal
           file: ./abis/Proposal.json
-        - name: FutarchyProposal
-          file: ./abis/FutarchyProposal.json
-        - name: AlgebraFactory
-          file: ./abis/AlgebraFactory.json
-        - name: ERC20
-          file: ./abis/ERC20.json
       eventHandlers:
         - event: ProposalAdded(indexed address)
           handler: handleProposalAdded
@@ -224,7 +148,7 @@ templates:
       apiVersion: 0.0.7
       language: wasm/assemblyscript
       entities:
-        - UnifiedOneStopShop
+        - ProposalEntity
       abis:
         - name: Proposal
           file: ./abis/Proposal.json

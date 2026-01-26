@@ -11,6 +11,7 @@ type Aggregator @entity(immutable: false) {
   editor: Bytes # Nullable: Editor role for delegated operations
   createdAt: BigInt!
   organizations: [Organization!]! @derivedFrom(field: "aggregator")
+  metadataProperties: [String!]
 }
 
 type Organization @entity(immutable: false) {
@@ -23,75 +24,39 @@ type Organization @entity(immutable: false) {
   owner: Bytes!
   editor: Bytes # Nullable: Editor role for delegated operations
   createdAt: BigInt!
-  proposals: [UnifiedOneStopShop!]! @derivedFrom(field: "organization")
+  proposals: [ProposalEntity!]! @derivedFrom(field: "organization")
+  metadataProperties: [String!]
 }
 
-type UnifiedOneStopShop @entity(immutable: false) {
-  id: ID! # Proposal Address (Trading Contract)
+
+type ProposalEntity @entity(immutable: false) {
+  id: ID! # Metadata Contract Address (Registry ID)
 
   # Hierarchy (Nullable because a proposal might exist without metadata initially, or vice versa)
   organization: Organization
-  metadataContract: Bytes # Address of the metadata contract
   owner: Bytes # Owner of the proposal metadata contract
   editor: Bytes # Nullable: Editor role for delegated operations
+  
+  # The Key Pointer
+  proposalAddress: Bytes! # The address of the proposal on the execution chain
 
   # Metadata
   title: String!
   description: String!
   metadata: String
   metadataURI: String
-  marketName: String!
+  
+  # Registry Specifics
   displayNameEvent: String!
   displayNameQuestion: String!
-  resolutionDate: BigInt!
   createdAtTimestamp: BigInt!
 
-  # The Tokens
-  companyToken: TokenInfo!
-  currencyToken: TokenInfo!
-
-  # Wrapped Outcomes (For debugging and linking)
-  outcomeYesCompany: String
-  outcomeNoCompany: String
-  outcomeYesCurrency: String
-  outcomeNoCurrency: String
-
-  # The 6 Pools
-  poolConditionalYes: NormalizedPool
-  poolConditionalNo: NormalizedPool
-  poolExpectedYes: NormalizedPool
-  poolExpectedNo: NormalizedPool
-  poolPredictionYes: NormalizedPool
-  poolPredictionNo: NormalizedPool
+  # Generic JSON Key Index
+  metadataProperties: [String!]
 }
 
-type TokenInfo @entity(immutable: false) {
-  id: ID!
-  symbol: String!
-  decimals: BigInt!
-  name: String!
-}
-
-type NormalizedPool @entity(immutable: false) {
-  id: ID! # Pool Address
-
-  # Reverse lookup to proposal (for age-based candle tiering)
-  proposal: UnifiedOneStopShop
-
-  # Basic Info
-  baseToken: TokenInfo!
-  quoteToken: TokenInfo!
-
-  # Internal: to know if we need to invert
-  isBaseToken0: Boolean!
-
-  # Current State
-  currentPrice: BigDecimal!
-  volume24h: BigDecimal!
-}
-
-# Needed for linking logic
-type PoolLookup @entity(immutable: false) {
-  id: ID! # Pool Address
-  pool: NormalizedPool!
-}
+# Entities Removed:
+# - NormalizedPool
+# - TokenInfo
+# - PoolLookup
+# - UnifiedOneStopShop (Renamed/Replaced by ProposalEntity)
