@@ -2,7 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.0.12] - 2026-01-26
+## [0.0.14] - 2026-01-26
+### Added
+- **Deep Value Indexing**: Added `MetadataEntry` entity to store key-value pairs from metadata JSON.
+- **Filtering**: Enables filtering by specific internal values, e.g. `where: { metadataEntries_: { key: "chain", value: "100" } }`.
+
+## [0.0.13] - 2026-01-26
 
 ### Added
 - **JSON Key Indexing**: Added `metadataProperties` field to `Aggregator`, `Organization`, and `ProposalEntity` entities.

@@ -12,6 +12,7 @@ type Aggregator @entity(immutable: false) {
   createdAt: BigInt!
   organizations: [Organization!]! @derivedFrom(field: "aggregator")
   metadataProperties: [String!]
+  metadataEntries: [MetadataEntry!]! @derivedFrom(field: "aggregator")
 }
 
 type Organization @entity(immutable: false) {
@@ -26,6 +27,7 @@ type Organization @entity(immutable: false) {
   createdAt: BigInt!
   proposals: [ProposalEntity!]! @derivedFrom(field: "organization")
   metadataProperties: [String!]
+  metadataEntries: [MetadataEntry!]! @derivedFrom(field: "organization")
 }
 
 
@@ -53,6 +55,18 @@ type ProposalEntity @entity(immutable: false) {
 
   # Generic JSON Key Index
   metadataProperties: [String!]
+  metadataEntries: [MetadataEntry!]! @derivedFrom(field: "proposal")
+}
+
+type MetadataEntry @entity(immutable: false) {
+  id: ID! # Format: "{ParentID}-{Key}"
+  key: String!
+  value: String!
+  
+  # Parent Pointers
+  aggregator: Aggregator
+  organization: Organization
+  proposal: ProposalEntity
 }
 
 # Entities Removed:

@@ -9,7 +9,8 @@ import { MetadataUpdated, Proposal as MetadataContract, ExtendedMetadataUpdated 
 import {
     ProposalEntity,
     Aggregator,
-    Organization
+    Organization,
+    MetadataEntry
 } from "../generated/schema"
 
 import {
@@ -47,6 +48,7 @@ export function handleAggregatorCreated(event: AggregatorMetadataCreated): void 
     let oCall = contract.try_owner()
     entity.owner = oCall.reverted ? event.transaction.from : oCall.value
     entity.metadataProperties = extractKeys(entity.metadata as string)
+    updateMetadataEntries(entity.id, "Aggregator", entity.metadata)
 
     entity.save()
 }
@@ -73,6 +75,7 @@ export function handleOrganizationMetadataCreated(event: OrganizationMetadataCre
     let uCall = contract.try_metadataURI()
     entity.metadataURI = uCall.reverted ? "" : uCall.value
     entity.metadataProperties = extractKeys(entity.metadata as string)
+    updateMetadataEntries(entity.id, "Organization", entity.metadata)
 
     entity.save()
 }
@@ -113,6 +116,7 @@ export function handleProposalMetadataCreated(event: ProposalMetadataCreated): v
     let mCall = contract.try_metadata()
     entity.metadata = mCall.reverted ? "" : mCall.value
     entity.metadataProperties = extractKeys(entity.metadata as string)
+    updateMetadataEntries(entity.id, "Proposal", entity.metadata)
 
     let uCall = contract.try_metadataURI()
     entity.metadataURI = uCall.reverted ? "" : uCall.value
@@ -171,6 +175,7 @@ export function handleOrganizationCreatedAndAdded(event: OrganizationCreatedAndA
     let uCall = contract.try_metadataURI()
     entity.metadataURI = uCall.reverted ? "" : uCall.value
     entity.metadataProperties = extractKeys(entity.metadata as string)
+    updateMetadataEntries(entity.id, "Organization", entity.metadata)
 
     entity.save()
 }
@@ -189,6 +194,7 @@ export function handleAggregatorExtendedMetadataUpdated(event: AggregatorExtende
         entity.metadata = event.params.metadata
         entity.metadataURI = event.params.metadataURI
         entity.metadataProperties = extractKeys(entity.metadata as string)
+        updateMetadataEntries(entity.id, "Aggregator", entity.metadata)
         entity.save()
     }
 }
@@ -260,6 +266,7 @@ export function handleProposalCreatedAndAdded(event: ProposalCreatedAndAdded): v
     let mCall = contract.try_metadata()
     entity.metadata = mCall.reverted ? "" : mCall.value
     entity.metadataProperties = extractKeys(entity.metadata as string)
+    updateMetadataEntries(entity.id, "Proposal", entity.metadata)
 
     let uCall = contract.try_metadataURI()
     entity.metadataURI = uCall.reverted ? "" : uCall.value
@@ -284,6 +291,7 @@ export function handleOrganizationExtendedMetadataUpdated(event: OrganizationExt
         entity.metadata = event.params.metadata
         entity.metadataURI = event.params.metadataURI
         entity.metadataProperties = extractKeys(entity.metadata as string)
+        updateMetadataEntries(entity.id, "Organization", entity.metadata)
         entity.save()
     }
 }
@@ -333,6 +341,7 @@ export function handleProposalExtendedMetadataUpdated(event: ProposalExtendedMet
         entity.metadata = event.params.metadata
         entity.metadataURI = event.params.metadataURI
         entity.metadataProperties = extractKeys(entity.metadata as string)
+        updateMetadataEntries(entity.id, "Proposal", entity.metadata)
         entity.save()
     }
 }
@@ -360,4 +369,49 @@ function extractKeys(metadata: string): string[] {
     }
 
     return keys
+}
+
+function updateMetadataEntries(parentId: string, parentType: string, metadata: string | null): void {
+    if (metadata === null) return
+    if (metadata.length == 0) return
+
+    let result = json.try_fromString(metadata)
+    if (result.isError) return
+    if (result.value.kind != JSONValueKind.OBJECT) return
+
+    let jsonObj = result.value.toObject()
+    let entries = jsonObj.entries
+
+    for (let i = 0; i < entries.length; i++) {
+        let key = entries[i].key
+        let value = entries[i].value
+        let strValue = ""
+
+        // Simpification: Convert everything to string for indexing
+        if (value.kind == JSONValueKind.STRING) {
+            strValue = value.toString()
+        } else if (value.kind == JSONValueKind.NUMBER) {
+            strValue = value.toF64().toString()
+        } else if (value.kind == JSONValueKind.BOOL) {
+            strValue = value.toBool() ? "true" : "false"
+        } else {
+            // Nested objects/arrays ignored for value indexing in this version
+            continue
+        }
+
+        let entryId = parentId + "-" + key
+        let entry = new MetadataEntry(entryId)
+        entry.key = key
+        entry.value = strValue
+
+        if (parentType == "Aggregator") {
+            entry.aggregator = parentId
+        } else if (parentType == "Organization") {
+            entry.organization = parentId
+        } else if (parentType == "Proposal") {
+            entry.proposal = parentId
+        }
+
+        entry.save()
+    }
 }
