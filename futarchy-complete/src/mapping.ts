@@ -47,7 +47,7 @@ export function handleAggregatorCreated(event: AggregatorMetadataCreated): void 
 
     let oCall = contract.try_owner()
     entity.owner = oCall.reverted ? event.transaction.from : oCall.value
-    entity.metadataProperties = extractKeys(entity.metadata as string)
+    entity.metadataProperties = extractKeys(entity.metadata !== null ? changetype<string>(entity.metadata) : "")
     updateMetadataEntries(entity.id, "Aggregator", entity.metadata)
 
     entity.save()
@@ -74,7 +74,7 @@ export function handleOrganizationMetadataCreated(event: OrganizationMetadataCre
 
     let uCall = contract.try_metadataURI()
     entity.metadataURI = uCall.reverted ? "" : uCall.value
-    entity.metadataProperties = extractKeys(entity.metadata as string)
+    entity.metadataProperties = extractKeys(entity.metadata !== null ? changetype<string>(entity.metadata) : "")
     updateMetadataEntries(entity.id, "Organization", entity.metadata)
 
     entity.save()
@@ -115,7 +115,7 @@ export function handleProposalMetadataCreated(event: ProposalMetadataCreated): v
 
     let mCall = contract.try_metadata()
     entity.metadata = mCall.reverted ? "" : mCall.value
-    entity.metadataProperties = extractKeys(entity.metadata as string)
+    entity.metadataProperties = extractKeys(entity.metadata !== null ? changetype<string>(entity.metadata) : "")
     updateMetadataEntries(entity.id, "Proposal", entity.metadata)
 
     let uCall = contract.try_metadataURI()
@@ -174,7 +174,7 @@ export function handleOrganizationCreatedAndAdded(event: OrganizationCreatedAndA
 
     let uCall = contract.try_metadataURI()
     entity.metadataURI = uCall.reverted ? "" : uCall.value
-    entity.metadataProperties = extractKeys(entity.metadata as string)
+    entity.metadataProperties = extractKeys(entity.metadata !== null ? changetype<string>(entity.metadata) : "")
     updateMetadataEntries(entity.id, "Organization", entity.metadata)
 
     entity.save()
@@ -193,7 +193,7 @@ export function handleAggregatorExtendedMetadataUpdated(event: AggregatorExtende
     if (entity != null) {
         entity.metadata = event.params.metadata
         entity.metadataURI = event.params.metadataURI
-        entity.metadataProperties = extractKeys(entity.metadata as string)
+        entity.metadataProperties = extractKeys(entity.metadata !== null ? changetype<string>(entity.metadata) : "")
         updateMetadataEntries(entity.id, "Aggregator", entity.metadata)
         entity.save()
     }
@@ -265,7 +265,7 @@ export function handleProposalCreatedAndAdded(event: ProposalCreatedAndAdded): v
 
     let mCall = contract.try_metadata()
     entity.metadata = mCall.reverted ? "" : mCall.value
-    entity.metadataProperties = extractKeys(entity.metadata as string)
+    entity.metadataProperties = extractKeys(entity.metadata !== null ? changetype<string>(entity.metadata) : "")
     updateMetadataEntries(entity.id, "Proposal", entity.metadata)
 
     let uCall = contract.try_metadataURI()
@@ -290,7 +290,7 @@ export function handleOrganizationExtendedMetadataUpdated(event: OrganizationExt
     if (entity != null) {
         entity.metadata = event.params.metadata
         entity.metadataURI = event.params.metadataURI
-        entity.metadataProperties = extractKeys(entity.metadata as string)
+        entity.metadataProperties = extractKeys(entity.metadata !== null ? changetype<string>(entity.metadata) : "")
         updateMetadataEntries(entity.id, "Organization", entity.metadata)
         entity.save()
     }
@@ -340,7 +340,7 @@ export function handleProposalExtendedMetadataUpdated(event: ProposalExtendedMet
     if (entity != null) {
         entity.metadata = event.params.metadata
         entity.metadataURI = event.params.metadataURI
-        entity.metadataProperties = extractKeys(entity.metadata as string)
+        entity.metadataProperties = extractKeys(entity.metadata !== null ? changetype<string>(entity.metadata) : "")
         updateMetadataEntries(entity.id, "Proposal", entity.metadata)
         entity.save()
     }
