@@ -1,0 +1,42 @@
+services:
+  checkpoint:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://checkpoint:checkpoint123@postgres:5432/checkpoint_futarchy
+      RPC_URL: https://rpc.gnosischain.com
+      RESET: ${RESET:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - checkpoint-net
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: checkpoint
+      POSTGRES_PASSWORD: checkpoint123
+      POSTGRES_DB: checkpoint_futarchy
+    volumes:
+      - checkpoint-postgres-data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U checkpoint -d checkpoint_futarchy"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - checkpoint-net
+
+volumes:
+  checkpoint-postgres-data:
+
+networks:
+  checkpoint-net:
+    driver: bridge

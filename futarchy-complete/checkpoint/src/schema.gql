@@ -1,0 +1,53 @@
+# Checkpoint Futarchy Schema
+# Note: Checkpoint uses standard GraphQL, no @entity directives needed
+# Using Text scalar for long content fields (metadata, descriptions, etc.)
+
+scalar Text
+
+type Aggregator {
+  id: String!
+  name: String!
+  description: Text!
+  metadata: Text
+  metadataURI: Text
+  creator: String!
+  owner: String!
+  editor: String
+  createdAt: Int!
+}
+
+type Organization {
+  id: String!
+  aggregator: String
+  name: String!
+  description: Text!
+  metadata: Text
+  metadataURI: Text
+  owner: String!
+  editor: String
+  createdAt: Int!
+}
+
+type ProposalEntity {
+  id: String!
+  organization: String
+  owner: String
+  editor: String
+  proposalAddress: String!
+  title: Text!
+  description: Text!
+  metadata: Text
+  metadataURI: Text
+  displayNameEvent: Text!
+  displayNameQuestion: Text!
+  createdAtTimestamp: Int!
+}
+
+type MetadataEntry {
+  id: String!
+  key: String!
+  value: Text!
+  aggregator: String
+  organization: String
+  proposal: String
+}
