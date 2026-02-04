@@ -31,6 +31,8 @@ const ProposalAbi = parseAbi([
     'function editor() view returns (address)'
 ]);
 
+// Aggregator address constant (same as in config)
+const AGGREGATOR_ADDRESS = '0xc5eb43d53e2fe5fdde5faf400cc4167e5b5d4fc1';
 const INDEXER_NAME = 'gnosis';
 
 // ============================================
@@ -41,7 +43,8 @@ export const handleOrganizationAdded: evm.Writer = async ({ event, blockNumber, 
     if (!event) return;
 
     const orgAddress = ((event as any).args?.organizationMetadata as string)?.toLowerCase();
-    const aggregatorId = source?.contract.toLowerCase();
+    // Use source.contract if available, otherwise fall back to default aggregator
+    const aggregatorId = source?.contract?.toLowerCase() || AGGREGATOR_ADDRESS;
 
     if (!orgAddress) return;
 
@@ -58,7 +61,7 @@ export const handleOrganizationAdded: evm.Writer = async ({ event, blockNumber, 
 
         // Create Organization entity using generated model
         const org = new Organization(orgAddress, INDEXER_NAME);
-        org.aggregator = aggregatorId || null;
+        org.aggregator = aggregatorId;
         org.name = name as string;
         org.description = description as string;
         org.metadata = metadata as string;
@@ -74,19 +77,21 @@ export const handleOrganizationAdded: evm.Writer = async ({ event, blockNumber, 
             start: blockNumber
         });
 
-        console.log(`✅ Organization added: ${name} (${orgAddress})`);
+        console.log(`✅ Organization added: ${name} (${orgAddress}) -> aggregator: ${aggregatorId}`);
     } catch (error) {
         console.error(`❌ Failed to add organization ${orgAddress}:`, error);
     }
 };
 
-export const handleOrganizationCreated: evm.Writer = async ({ event, blockNumber, helpers }) => {
+
+export const handleOrganizationCreated: evm.Writer = async ({ event, blockNumber, source, helpers }) => {
     if (!event) return;
 
     const args = (event as any).args;
     const orgAddress = (args?.organizationMetadata as string)?.toLowerCase();
     const companyName = args?.companyName;
-    const aggregatorId = args?.aggregator?.toLowerCase();
+    // Use source.contract or default aggregator
+    const aggregatorId = source?.contract?.toLowerCase() || AGGREGATOR_ADDRESS;
 
     if (!orgAddress) return;
 
@@ -101,7 +106,7 @@ export const handleOrganizationCreated: evm.Writer = async ({ event, blockNumber
         ]);
 
         const org = new Organization(orgAddress, INDEXER_NAME);
-        org.aggregator = aggregatorId || null;
+        org.aggregator = aggregatorId;
         org.name = companyName;
         org.description = description as string;
         org.metadata = metadata as string;

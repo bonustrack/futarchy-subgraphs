@@ -111,6 +111,30 @@ curl http://localhost:3000/health
 # Returns: {"status":"ok","version":"1.0.0"}
 ```
 
+### Full Relationship Chain (Proposal → Organization → Aggregator)
+```bash
+# Step 1: Get proposal by trading address
+curl -s http://localhost:3000/graphql -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ proposalentities(where: { proposalAddress: \"0x45e1064348fd8a407d6d1f59fc64b05f633b28fc\" }) { id proposalAddress organization } }"}'
+
+# Step 2: Get organization with aggregator
+curl -s http://localhost:3000/graphql -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ organizations(where: { id: \"0x3fd2e8e71f75eed4b5c507706c413e33e0661bbf\" }) { id name aggregator } }"}'
+```
+
+**Complete Chain:**
+```
+proposalAddress: 0x45e1064348fd8a407d6d1f59fc64b05f633b28fc
+      ↓
+proposal_metadata: 0xa78a2d5844c653dac60da8a3f9ec958d09a4ee6a
+      ↓
+organization: 0x3fd2e8e71f75eed4b5c507706c413e33e0661bbf (Gnosis DAO)
+      ↓
+aggregator: 0xc5eb43d53e2fe5fdde5faf400cc4167e5b5d4fc1 ✅
+```
+
 ---
 
 ## Entity Schema
