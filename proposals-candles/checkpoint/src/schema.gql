@@ -1,0 +1,76 @@
+scalar Text
+
+type WhitelistedToken {
+  id: String!
+  chain: Int!
+  address: String!
+  symbol: String
+  decimals: Int
+  role: String!
+  proposal: String
+}
+
+type Proposal {
+  id: String!
+  chain: Int!
+  address: String!
+  marketName: Text
+  companyToken: String!
+  currencyToken: String!
+  outcomeTokens: Text
+}
+
+type Pool {
+  id: String!
+  chain: Int!
+  address: String!
+  dex: String!
+  token0: String!
+  token1: String!
+  fee: String
+  liquidity: String!
+  sqrtPrice: String!
+  price: String!
+  tick: Int
+  isInverted: Int!
+  name: String!
+  type: String!
+  outcomeSide: String
+  volumeToken0: String!
+  volumeToken1: String!
+  proposal: String
+}
+
+type Candle {
+  id: String!
+  chain: Int!
+  pool: String!
+  time: Int!
+  period: Int!
+  periodStartUnix: Int!
+  block: Int!
+  open: String!
+  high: String!
+  low: String!
+  close: String!
+  volumeToken0: String!
+  volumeToken1: String!
+}
+
+type Swap {
+  id: String!
+  chain: Int!
+  transactionHash: String!
+  timestamp: Int!
+  pool: String!
+  sender: String!
+  recipient: String!
+  origin: String!
+  amount0: String!
+  amount1: String!
+  amountIn: String!
+  amountOut: String!
+  tokenIn: String!
+  tokenOut: String!
+  price: String!
+}
