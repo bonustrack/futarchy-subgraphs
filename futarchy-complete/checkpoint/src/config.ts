@@ -1,9 +1,5 @@
 import { CheckpointConfig } from '@snapshot-labs/checkpoint';
-
-// Import ABIs with require to avoid TypeScript issues
-const AggregatorAbi = require('./abis/Aggregator.json');
-const OrganizationAbi = require('./abis/Organization.json');
-const ProposalMetadataAbi = require('./abis/Proposal.json');  // Using Proposal.json
+import { AggregatorAbi, OrganizationAbi, ProposalMetadataAbi } from './abis';
 
 // Gnosis Chain contract addresses
 const AGGREGATOR_ADDRESS = '0xC5eB43D53e2FE5FddE5faf400CC4167e5b5d4Fc1';

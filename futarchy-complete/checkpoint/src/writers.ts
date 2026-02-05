@@ -1,35 +1,14 @@
 import { evm } from '@snapshot-labs/checkpoint';
-import { createPublicClient, http, parseAbi } from 'viem';
+import { createPublicClient, http } from 'viem';
 import { gnosis } from 'viem/chains';
 import { Aggregator, Organization, ProposalEntity } from '../.checkpoint/models';
+import { OrganizationAbi, ProposalMetadataAbi } from './abis';
 
 // Viem client for reading contract state
 const client = createPublicClient({
     chain: gnosis,
     transport: http(process.env.RPC_URL || 'https://rpc.gnosischain.com')
 });
-
-// Organization ABI for reading state
-const OrgAbi = parseAbi([
-    'function companyName() view returns (string)',
-    'function description() view returns (string)',
-    'function metadata() view returns (string)',
-    'function metadataURI() view returns (string)',
-    'function owner() view returns (address)',
-    'function editor() view returns (address)'
-]);
-
-// Proposal ABI for reading state  
-const ProposalAbi = parseAbi([
-    'function proposalAddress() view returns (address)',
-    'function displayNameQuestion() view returns (string)',
-    'function displayNameEvent() view returns (string)',
-    'function description() view returns (string)',
-    'function metadata() view returns (string)',
-    'function metadataURI() view returns (string)',
-    'function owner() view returns (address)',
-    'function editor() view returns (address)'
-]);
 
 // Aggregator address constant (same as in config)
 const AGGREGATOR_ADDRESS = '0xc5eb43d53e2fe5fdde5faf400cc4167e5b5d4fc1';
@@ -51,12 +30,12 @@ export const handleOrganizationAdded: evm.Writer = async ({ event, blockNumber, 
     try {
         // Read organization data from contract
         const [name, description, metadata, metadataURI, owner, editor] = await Promise.all([
-            client.readContract({ address: orgAddress as `0x${string}`, abi: OrgAbi, functionName: 'companyName' }),
-            client.readContract({ address: orgAddress as `0x${string}`, abi: OrgAbi, functionName: 'description' }),
-            client.readContract({ address: orgAddress as `0x${string}`, abi: OrgAbi, functionName: 'metadata' }),
-            client.readContract({ address: orgAddress as `0x${string}`, abi: OrgAbi, functionName: 'metadataURI' }),
-            client.readContract({ address: orgAddress as `0x${string}`, abi: OrgAbi, functionName: 'owner' }),
-            client.readContract({ address: orgAddress as `0x${string}`, abi: OrgAbi, functionName: 'editor' })
+            client.readContract({ address: orgAddress as `0x${string}`, abi: OrganizationAbi, functionName: 'companyName' }),
+            client.readContract({ address: orgAddress as `0x${string}`, abi: OrganizationAbi, functionName: 'description' }),
+            client.readContract({ address: orgAddress as `0x${string}`, abi: OrganizationAbi, functionName: 'metadata' }),
+            client.readContract({ address: orgAddress as `0x${string}`, abi: OrganizationAbi, functionName: 'metadataURI' }),
+            client.readContract({ address: orgAddress as `0x${string}`, abi: OrganizationAbi, functionName: 'owner' }),
+            client.readContract({ address: orgAddress as `0x${string}`, abi: OrganizationAbi, functionName: 'editor' })
         ]);
 
         // Create Organization entity using generated model
@@ -98,11 +77,11 @@ export const handleOrganizationCreated: evm.Writer = async ({ event, blockNumber
     try {
         // Read full organization data
         const [description, metadata, metadataURI, owner, editor] = await Promise.all([
-            client.readContract({ address: orgAddress as `0x${string}`, abi: OrgAbi, functionName: 'description' }),
-            client.readContract({ address: orgAddress as `0x${string}`, abi: OrgAbi, functionName: 'metadata' }),
-            client.readContract({ address: orgAddress as `0x${string}`, abi: OrgAbi, functionName: 'metadataURI' }),
-            client.readContract({ address: orgAddress as `0x${string}`, abi: OrgAbi, functionName: 'owner' }),
-            client.readContract({ address: orgAddress as `0x${string}`, abi: OrgAbi, functionName: 'editor' })
+            client.readContract({ address: orgAddress as `0x${string}`, abi: OrganizationAbi, functionName: 'description' }),
+            client.readContract({ address: orgAddress as `0x${string}`, abi: OrganizationAbi, functionName: 'metadata' }),
+            client.readContract({ address: orgAddress as `0x${string}`, abi: OrganizationAbi, functionName: 'metadataURI' }),
+            client.readContract({ address: orgAddress as `0x${string}`, abi: OrganizationAbi, functionName: 'owner' }),
+            client.readContract({ address: orgAddress as `0x${string}`, abi: OrganizationAbi, functionName: 'editor' })
         ]);
 
         const org = new Organization(orgAddress, INDEXER_NAME);
@@ -162,14 +141,14 @@ export const handleProposalAdded: evm.Writer = async ({ event, blockNumber, sour
     try {
         // Read proposal data from contract
         const [tradingAddress, title, displayNameEvent, description, metadata, metadataURI, owner, editor] = await Promise.all([
-            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalAbi, functionName: 'proposalAddress' }),
-            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalAbi, functionName: 'displayNameQuestion' }),
-            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalAbi, functionName: 'displayNameEvent' }),
-            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalAbi, functionName: 'description' }),
-            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalAbi, functionName: 'metadata' }),
-            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalAbi, functionName: 'metadataURI' }),
-            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalAbi, functionName: 'owner' }),
-            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalAbi, functionName: 'editor' })
+            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'proposalAddress' }),
+            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'displayNameQuestion' }),
+            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'displayNameEvent' }),
+            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'description' }),
+            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'metadata' }),
+            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'metadataURI' }),
+            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'owner' }),
+            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'editor' })
         ]);
 
         const proposal = new ProposalEntity(proposalAddress, INDEXER_NAME);
@@ -208,14 +187,14 @@ export const handleProposalCreated: evm.Writer = async ({ event, blockNumber, so
 
     try {
         const [tradingAddress, title, displayNameEvent, description, metadata, metadataURI, owner, editor] = await Promise.all([
-            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalAbi, functionName: 'proposalAddress' }),
-            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalAbi, functionName: 'displayNameQuestion' }),
-            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalAbi, functionName: 'displayNameEvent' }),
-            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalAbi, functionName: 'description' }),
-            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalAbi, functionName: 'metadata' }),
-            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalAbi, functionName: 'metadataURI' }),
-            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalAbi, functionName: 'owner' }),
-            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalAbi, functionName: 'editor' })
+            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'proposalAddress' }),
+            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'displayNameQuestion' }),
+            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'displayNameEvent' }),
+            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'description' }),
+            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'metadata' }),
+            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'metadataURI' }),
+            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'owner' }),
+            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'editor' })
         ]);
 
         const proposal = new ProposalEntity(proposalAddress, INDEXER_NAME);
