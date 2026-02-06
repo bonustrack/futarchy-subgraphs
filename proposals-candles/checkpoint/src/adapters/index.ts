@@ -16,8 +16,14 @@ export const CHAIN_IDS: Record<string, number> = {
 export function getSourceName(source: any): string {
     if (typeof source === 'string') return source;
 
-    // Checkpoint source object has contract address - detect chain by known contracts
+    // Checkpoint source object - check for indexer property first (used by template events)
     if (typeof source === 'object' && source !== null) {
+        // Template events include 'indexer' property directly
+        if (source.indexer && typeof source.indexer === 'string') {
+            return source.indexer;
+        }
+
+        // Fall back to contract-based detection for factory events
         const contract = (source.contract as string)?.toLowerCase();
 
         // Mainnet contracts

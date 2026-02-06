@@ -270,37 +270,63 @@ async function createPoolEntity(
 export const handleInitialize: evm.Writer = async ({ event, source }) => {
     if (!event) return;
 
-    const indexer = getSourceName(source);
-    const args = (event as any).args;
-    const chainId = CHAIN_IDS[indexer] || 100;
     const poolAddr = (event as any).address?.toLowerCase();
-    const poolId = createId(chainId, poolAddr);
+
+    // Try both chain IDs since template events don't include indexer info
+    // We need to find the existing pool which was created with the correct chain ID
+    let pool = await Pool.loadEntity(`1-${poolAddr}`, 'mainnet');
+    let indexer = 'mainnet';
+    let chainId = 1;
+
+    if (!pool) {
+        pool = await Pool.loadEntity(`100-${poolAddr}`, 'gnosis');
+        indexer = 'gnosis';
+        chainId = 100;
+    }
+
+    if (!pool) {
+        console.log(`[unknown] Initialize: Pool ${poolAddr} not found in either chain`);
+        return;
+    }
 
     // Both Algebra and Uniswap V3 have same event signature
+    const args = (event as any).args;
     const sqrtPriceX96 = BigInt((args?.[0] || args?.price || args?.sqrtPriceX96 || 0).toString());
     const tick = Number(args?.[1] || args?.tick || 0);
     const price = convertSqrtPriceX96(sqrtPriceX96);
 
-    const pool = await Pool.loadEntity(poolId, indexer);
-    if (pool) {
-        pool.sqrtPrice = sqrtPriceX96.toString();
-        pool.price = price.toString();
-        pool.tick = tick;
-        await pool.save();
-    }
+    pool.sqrtPrice = sqrtPriceX96.toString();
+    pool.price = price.toString();
+    pool.tick = tick;
+    await pool.save();
 
-    console.log(`[${indexer}] Initialize pool ${poolId}: price=${price.toFixed(8)}`);
+    console.log(`[${indexer}] Initialize pool ${chainId}-${poolAddr}: price=${price.toFixed(8)}`);
 };
 
 export const handleSwap: evm.Writer = async ({ event, source, block }) => {
     if (!event) return;
 
-    const indexer = getSourceName(source);
-    const args = (event as any).args;
-    const chainId = CHAIN_IDS[indexer] || 100;
     const poolAddr = (event as any).address?.toLowerCase();
-    const poolId = createId(chainId, poolAddr);
 
+    // Try both chain IDs since template events don't include indexer info
+    let pool = await Pool.loadEntity(`1-${poolAddr}`, 'mainnet');
+    let indexer = 'mainnet';
+    let chainId = 1;
+    let poolId = `1-${poolAddr}`;
+
+    if (!pool) {
+        pool = await Pool.loadEntity(`100-${poolAddr}`, 'gnosis');
+        indexer = 'gnosis';
+        chainId = 100;
+        poolId = `100-${poolAddr}`;
+    }
+
+    if (!pool) {
+        // Pool not found - skip (might be non-Futarchy pool)
+        return;
+    }
+
+    const args = (event as any).args;
     const sender = (args?.sender as string)?.toLowerCase() || '';
     const recipient = (args?.recipient as string)?.toLowerCase() || '';
     const amount0 = BigInt((args?.amount0 || 0).toString());
@@ -336,16 +362,13 @@ export const handleSwap: evm.Writer = async ({ event, source, block }) => {
     await swap.save();
 
     // Update pool
-    const pool = await Pool.loadEntity(poolId, indexer);
-    if (pool) {
-        pool.sqrtPrice = sqrtPriceX96.toString();
-        pool.price = price.toString();
-        pool.liquidity = liquidity.toString();
-        pool.tick = tick;
-        pool.volumeToken0 = (BigInt(pool.volumeToken0 || '0') + (amount0 < 0n ? -amount0 : amount0)).toString();
-        pool.volumeToken1 = (BigInt(pool.volumeToken1 || '0') + (amount1 < 0n ? -amount1 : amount1)).toString();
-        await pool.save();
-    }
+    pool.sqrtPrice = sqrtPriceX96.toString();
+    pool.price = price.toString();
+    pool.liquidity = liquidity.toString();
+    pool.tick = tick;
+    pool.volumeToken0 = (BigInt(pool.volumeToken0 || '0') + (amount0 < 0n ? -amount0 : amount0)).toString();
+    pool.volumeToken1 = (BigInt(pool.volumeToken1 || '0') + (amount1 < 0n ? -amount1 : amount1)).toString();
+    await pool.save();
 
     // Update candles for each period
     for (const period of CANDLE_PERIODS) {
@@ -388,19 +411,26 @@ export const handleSwap: evm.Writer = async ({ event, source, block }) => {
 export const handleMint: evm.Writer = async ({ event, source }) => {
     if (!event) return;
 
-    const indexer = getSourceName(source);
-    const args = (event as any).args;
-    const chainId = CHAIN_IDS[indexer] || 100;
     const poolAddr = (event as any).address?.toLowerCase();
-    const poolId = createId(chainId, poolAddr);
 
+    // Try both chain IDs since template events don't include indexer info
+    let pool = await Pool.loadEntity(`1-${poolAddr}`, 'mainnet');
+    let indexer = 'mainnet';
+    let poolId = `1-${poolAddr}`;
+
+    if (!pool) {
+        pool = await Pool.loadEntity(`100-${poolAddr}`, 'gnosis');
+        indexer = 'gnosis';
+        poolId = `100-${poolAddr}`;
+    }
+
+    if (!pool) return;
+
+    const args = (event as any).args;
     const liquidityDelta = BigInt((args?.[4] || args?.liquidityAmount || args?.amount || 0).toString());
 
-    const pool = await Pool.loadEntity(poolId, indexer);
-    if (pool) {
-        pool.liquidity = (BigInt(pool.liquidity || '0') + liquidityDelta).toString();
-        await pool.save();
-    }
+    pool.liquidity = (BigInt(pool.liquidity || '0') + liquidityDelta).toString();
+    await pool.save();
 
     console.log(`[${indexer}] Mint on ${poolId}: +${liquidityDelta.toString()}`);
 };
@@ -408,20 +438,27 @@ export const handleMint: evm.Writer = async ({ event, source }) => {
 export const handleBurn: evm.Writer = async ({ event, source }) => {
     if (!event) return;
 
-    const indexer = getSourceName(source);
-    const args = (event as any).args;
-    const chainId = CHAIN_IDS[indexer] || 100;
     const poolAddr = (event as any).address?.toLowerCase();
-    const poolId = createId(chainId, poolAddr);
 
+    // Try both chain IDs since template events don't include indexer info
+    let pool = await Pool.loadEntity(`1-${poolAddr}`, 'mainnet');
+    let indexer = 'mainnet';
+    let poolId = `1-${poolAddr}`;
+
+    if (!pool) {
+        pool = await Pool.loadEntity(`100-${poolAddr}`, 'gnosis');
+        indexer = 'gnosis';
+        poolId = `100-${poolAddr}`;
+    }
+
+    if (!pool) return;
+
+    const args = (event as any).args;
     const liquidityDelta = BigInt((args?.[3] || args?.liquidityAmount || args?.amount || 0).toString());
 
-    const pool = await Pool.loadEntity(poolId, indexer);
-    if (pool) {
-        const currentLiq = BigInt(pool.liquidity || '0');
-        pool.liquidity = (currentLiq > liquidityDelta ? currentLiq - liquidityDelta : 0n).toString();
-        await pool.save();
-    }
+    const currentLiq = BigInt(pool.liquidity || '0');
+    pool.liquidity = (currentLiq > liquidityDelta ? currentLiq - liquidityDelta : 0n).toString();
+    await pool.save();
 
     console.log(`[${indexer}] Burn on ${poolId}: -${liquidityDelta.toString()}`);
 };
