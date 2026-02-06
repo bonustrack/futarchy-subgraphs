@@ -4,17 +4,47 @@ This guide explains how to run the **Snapshot Checkpoint** indexers for Futarchy
 
 ## Available Indexers
 
-| Indexer | Port | Chains | Description |
-|---------|------|--------|-------------|
-| **proposals-candles** | 3001 | Gnosis + Mainnet | Pool candles, swaps, proposals |
-| **futarchy-complete** | 3000 | Gnosis only | Full governance: organizations, proposals, metadata |
+| Indexer | Port | Postgres | Container Name | Description |
+|---------|------|----------|----------------|-------------|
+| **proposals-candles** | 3001 | 5434 | `checkpoint-checkpoint-1` | Pool candles, swaps, proposals (Gnosis + Mainnet) |
+| **futarchy-registry** | 3002 | 5435 | `futarchy-registry-checkpoint` | Organizations, proposals, metadata (Gnosis only) |
 
+> **Note:** Both indexers can run simultaneously on different ports without conflicts.
 
 ---
 
 ## Quick Start
 
-### 1. Proposals Candles Indexer
+### Run Both Indexers Simultaneously
+
+```bash
+# Start Proposals-Candles (port 3001)
+cd proposals-candles/checkpoint
+docker compose up -d
+
+# Start Futarchy Registry (port 3002)
+cd ../futarchy-complete/checkpoint
+docker compose up -d
+```
+
+### Check All Running Containers
+
+```bash
+docker ps --format "table {{.Names}}\t{{.Ports}}\t{{.Status}}"
+```
+
+Expected output:
+```
+NAMES                          PORTS                        STATUS
+checkpoint-checkpoint-1        0.0.0.0:3001->3000/tcp       Up
+futarchy-registry-checkpoint   0.0.0.0:3002->3000/tcp       Up
+```
+
+---
+
+## Individual Indexer Setup
+
+### 1. Proposals Candles Indexer (Port 3001)
 
 ```bash
 cd proposals-candles/checkpoint
@@ -33,7 +63,9 @@ RESET=true docker compose up -d
 
 **GraphQL Endpoint:** http://localhost:3001/graphql
 
-### 2. Futarchy Complete Indexer
+**Schema:** `pools`, `swaps`, `candles`, `proposals`, `whitelistedtokens`
+
+### 2. Futarchy Registry Indexer (Port 3002)
 
 ```bash
 cd futarchy-complete/checkpoint
@@ -45,17 +77,20 @@ docker compose up -d
 RESET=true docker compose up -d
 ```
 
-**GraphQL Endpoint:** http://localhost:3000/graphql
+**GraphQL Endpoint:** http://localhost:3002/graphql
+
+**Schema:** `organizations`, `proposalentities`, `metadataentries`, `aggregators`
 
 ---
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MAINNET_RPC_URL` | `https://eth.llamarpc.com` | Ethereum RPC endpoint |
-| `GNOSIS_RPC_URL` | `https://rpc.gnosischain.com` | Gnosis Chain RPC endpoint |
-| `RESET` | `false` | Set to `true` to wipe DB and resync |
+| Variable | Default | Used By |
+|----------|---------|---------|
+| `MAINNET_RPC_URL` | `https://eth.llamarpc.com` | proposals-candles |
+| `GNOSIS_RPC_URL` | `https://rpc.gnosischain.com` | proposals-candles |
+| `RPC_URL` | `https://rpc.gnosischain.com` | futarchy-registry |
+| `RESET` | `false` | Both (set `true` to wipe DB) |
 
 > **Note:** Free RPCs have rate limits. For production, use paid RPCs like Infura or Alchemy.
 
@@ -64,16 +99,23 @@ RESET=true docker compose up -d
 ## Common Commands
 
 ```bash
-# View logs
-docker compose logs -f checkpoint
+# View logs for each indexer
+docker logs -f checkpoint-checkpoint-1        # proposals-candles
+docker logs -f futarchy-registry-checkpoint   # registry
 
-# Check sync status
-curl -s -X POST http://localhost:3001/graphql \
+# Check sync status (proposals-candles)
+curl -s http://localhost:3001/graphql -X POST \
   -H "Content-Type: application/json" \
   -d '{"query":"{ proposals { id } }"}' | jq '.data.proposals | length'
 
-# Stop
-docker compose down
+# Check sync status (registry)
+curl -s http://localhost:3002/graphql -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ organizations { id } }"}' | jq '.data.organizations | length'
+
+# Stop individual indexer
+cd proposals-candles/checkpoint && docker compose down
+cd futarchy-complete/checkpoint && docker compose down
 
 # Stop and remove data
 docker compose down -v
@@ -83,7 +125,7 @@ docker compose down -v
 
 ## Example Queries
 
-### Proposals Candles
+### Proposals Candles (Port 3001)
 
 ```graphql
 # Get all proposals by chain
@@ -120,7 +162,7 @@ docker compose down -v
 }
 ```
 
-### Futarchy Complete
+### Futarchy Registry (Port 3002)
 
 ```graphql
 # Get organizations
@@ -128,16 +170,28 @@ docker compose down -v
   organizations {
     id
     name
-    description
+    owner
   }
 }
 
 # Get proposals with metadata
 {
-  proposalmetadatas {
+  proposalentities {
     id
-    displayNameQuestion
+    proposalAddress
+    title
     displayNameEvent
+    organization
+  }
+}
+
+# Get metadata entries
+{
+  metadataentries(where: { key: "coingecko_ticker" }) {
+    key
+    value
+    proposal
+    organization
   }
 }
 ```
@@ -148,25 +202,32 @@ docker compose down -v
 
 | Chain | Start Block | Sync Time |
 |-------|-------------|-----------|
-| Gnosis | 35,000,000 | ~30-40 min |
-| Mainnet | 23,400,000 | ~10-15 min |
+| Gnosis | 38,000,000 | ~5-10 min |
+| Mainnet | 21,000,000 | ~5-10 min |
 
 ---
 
 ## Troubleshooting
+
+### Port Conflicts
+If you see port conflicts, ensure both indexers use their designated ports:
+- proposals-candles: **3001** (GraphQL), **5434** (Postgres)
+- futarchy-registry: **3002** (GraphQL), **5435** (Postgres)
 
 ### RPC Rate Limits
 If you see errors about block range limits, the indexer includes a patch for PublicNode's `-32603` error. For other RPCs, consider using paid endpoints.
 
 ### Database Issues
 ```bash
-# Full reset
+# Full reset for specific indexer
+cd proposals-candles/checkpoint
 docker compose down -v
 RESET=true docker compose up -d
 ```
 
 ### Check Container Health
 ```bash
-docker compose ps
-docker compose logs checkpoint --tail 50
+docker ps -a
+docker logs checkpoint-checkpoint-1 --tail 50
+docker logs futarchy-registry-checkpoint --tail 50
 ```

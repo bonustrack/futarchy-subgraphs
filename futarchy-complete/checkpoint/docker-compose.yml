@@ -1,42 +1,44 @@
 services:
-  checkpoint:
+  registry-checkpoint:
+    container_name: futarchy-registry-checkpoint
     build: .
     ports:
-      - "3000:3000"
+      - "3002:3000"
     environment:
-      DATABASE_URL: postgres://checkpoint:checkpoint123@postgres:5432/checkpoint_futarchy
+      DATABASE_URL: postgres://checkpoint:checkpoint123@registry-postgres:5432/checkpoint_registry
       RPC_URL: https://rpc.gnosischain.com
       RESET: ${RESET:-false}
     depends_on:
-      postgres:
+      registry-postgres:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - checkpoint-net
+      - registry-net
 
-  postgres:
+  registry-postgres:
+    container_name: futarchy-registry-postgres
     image: postgres:15-alpine
     environment:
       POSTGRES_USER: checkpoint
       POSTGRES_PASSWORD: checkpoint123
-      POSTGRES_DB: checkpoint_futarchy
+      POSTGRES_DB: checkpoint_registry
     volumes:
-      - checkpoint-postgres-data:/var/lib/postgresql/data
+      - registry-postgres-data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
-      - "5433:5432"
+      - "5435:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U checkpoint -d checkpoint_futarchy"]
+      test: ["CMD-SHELL", "pg_isready -U checkpoint -d checkpoint_registry"]
       interval: 5s
       timeout: 5s
       retries: 5
     restart: unless-stopped
     networks:
-      - checkpoint-net
+      - registry-net
 
 volumes:
-  checkpoint-postgres-data:
+  registry-postgres-data:
 
 networks:
-  checkpoint-net:
+  registry-net:
     driver: bridge
