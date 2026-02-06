@@ -4,10 +4,11 @@ This guide explains how to run the **Snapshot Checkpoint** indexers for Futarchy
 
 ## Available Indexers
 
-| Indexer | Port | Description |
-|---------|------|-------------|
-| **proposals-candles** | 3001 | Pool candles, swaps, proposals (Gnosis + Mainnet) |
-| **futarchy-complete** | 3000 | Full governance: organizations, proposals, metadata |
+| Indexer | Port | Chains | Description |
+|---------|------|--------|-------------|
+| **proposals-candles** | 3001 | Gnosis + Mainnet | Pool candles, swaps, proposals |
+| **futarchy-complete** | 3000 | Gnosis only | Full governance: organizations, proposals, metadata |
+
 
 ---
 
