@@ -187,3 +187,61 @@ docker compose exec postgres psql -U checkpoint -d checkpoint_futarchy -c "SELEC
 - **GraphQL field names:** Use lowercase (e.g., `proposalentities` not `proposalEntities`)
 - **Data persists:** Uses Docker volume `checkpoint_checkpoint-postgres-data`
 - See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for troubleshooting
+
+---
+
+## Troubleshooting
+
+### Proposals Not Being Indexed
+
+**Symptom:** Organizations are indexed but proposals show 0 count.
+
+**Root Cause:** The `ProposalCreatedAndAdded` event signature must exactly match the contract ABI.
+
+**Files to Check:**
+1. `src/abis/organization.ts` - ABI definition
+2. `src/config.ts` - Event signature in templates section
+
+**Correct Signature (as of 2026-02):**
+```typescript
+// organization.ts
+{
+    name: 'ProposalCreatedAndAdded',
+    inputs: [
+        { indexed: true, name: 'proposalMetadata', type: 'address' },
+        { indexed: true, name: 'proposalAddress', type: 'address' }  // NOT string!
+    ]
+}
+
+// config.ts
+{ name: 'ProposalCreatedAndAdded(address,address)', fn: 'handleProposalCreated' }
+```
+
+**Wrong Signature (will cause 0 proposals):**
+```typescript
+// ❌ WRONG - old signature that doesn't match contract
+{ name: 'ProposalCreatedAndAdded(address,string,string)', fn: 'handleProposalCreated' }
+```
+
+**How to Verify:**
+```bash
+# Check on-chain event signature via RPC
+curl -s -X POST https://rpc.gnosischain.com -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"address":"0x818fdf727aa4672c80bbfd47ee13975080ac40e5","topics":["0x..."],"fromBlock":"0x2A2FA00","toBlock":"latest"}],"id":1}'
+```
+
+### Metadata Entries Mismatch
+
+**Symptom:** Fewer metadata entries than expected vs CloudFront.
+
+**Cause:** CloudFront uses APPEND-ONLY pattern (never deletes old keys). Checkpoint indexes current on-chain state only. Stale historical entries (later overwritten) will not appear in checkpoint.
+
+**Verification:**
+```bash
+# Check current on-chain metadata
+curl -s -X POST https://rpc.gnosischain.com -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_call","params":[{"to":"0x818fdf727aa4672c80bbfd47ee13975080ac40e5","data":"0x392f37e9"},"latest"],"id":1}' | jq -r '.result' | xxd -r -p | strings | tail -1
+```
+
+If the on-chain metadata doesn't contain a key, the checkpoint correctly won't have it.
+
