@@ -88,6 +88,8 @@ export const handleNewProposal: evm.Writer = async ({ event, blockNumber, source
 
         // Get 4 wrapped outcome tokens
         const roles = [ROLE_YES_COMPANY, ROLE_NO_COMPANY, ROLE_YES_CURRENCY, ROLE_NO_CURRENCY];
+        const outcomeTokenIds: string[] = [];
+
         for (let i = 0; i < 4; i++) {
             try {
                 const outcome = await client.readContract({
@@ -95,13 +97,21 @@ export const handleNewProposal: evm.Writer = async ({ event, blockNumber, source
                     abi: FutarchyProposalAbi,
                     functionName: 'wrappedOutcome',
                     args: [BigInt(i)]
-                });
-                const tokenAddress = (outcome as any)[5]; // wrapped1155 address
+                }) as any;
+
+                // New ABI returns (address wrapped1155, bytes data)
+                // outcome is an array: [wrapped1155Address, dataBytes]
+                // or object: { wrapped1155, data }
+                const tokenAddress = outcome[0] || outcome.wrapped1155;
+
+                console.log(`[${indexer}] wrappedOutcome[${i}]: ${tokenAddress}`);
+
                 if (tokenAddress && tokenAddress !== '0x0000000000000000000000000000000000000000') {
                     await saveToken(indexer, tokenAddress, roles[i], proposalId, client);
+                    outcomeTokenIds.push(createId(chainId, tokenAddress));
                 }
-            } catch {
-                // Token at index doesn't exist
+            } catch (err) {
+                console.log(`[${indexer}] wrappedOutcome[${i}] failed:`, (err as any)?.message || err);
             }
         }
 
@@ -112,14 +122,15 @@ export const handleNewProposal: evm.Writer = async ({ event, blockNumber, source
         proposal.marketName = marketName || '';
         proposal.companyToken = collateral1 ? createId(chainId, collateral1 as string) : '';
         proposal.currencyToken = collateral2 ? createId(chainId, collateral2 as string) : '';
-        proposal.outcomeTokens = JSON.stringify(roles.map((_, i) => `${proposalId}-outcome-${i}`));
+        proposal.outcomeTokens = JSON.stringify(outcomeTokenIds);
         await proposal.save();
 
-        console.log(`✅ [${indexer}] Whitelisted tokens for proposal ${proposalAddr}`);
+        console.log(`✅ [${indexer}] Whitelisted tokens for proposal ${proposalAddr} (${outcomeTokenIds.length} outcome tokens)`);
     } catch (err) {
         console.error(`❌ [${indexer}] Error processing proposal ${proposalAddr}:`, err);
     }
 };
+
 
 async function saveToken(
     indexer: string,

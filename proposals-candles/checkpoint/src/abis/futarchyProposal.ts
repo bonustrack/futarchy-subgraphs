@@ -22,24 +22,16 @@ export const FutarchyProposalAbi = [
         type: 'function'
     },
     {
+        // Actual signature: wrappedOutcome(uint256):(address,bytes)
+        // Returns: wrapped1155 token address and data bytes
         inputs: [{ internalType: 'uint256', name: 'index', type: 'uint256' }],
         name: 'wrappedOutcome',
         outputs: [
-            {
-                components: [
-                    { internalType: 'contract IERC20', name: 'collateralToken', type: 'address' },
-                    { internalType: 'bytes32', name: 'parentCollectionId', type: 'bytes32' },
-                    { internalType: 'bytes32', name: 'conditionId', type: 'bytes32' },
-                    { internalType: 'uint256', name: 'indexSet', type: 'uint256' },
-                    { internalType: 'contract Wrapped1155Factory', name: 'wrapper', type: 'address' },
-                    { internalType: 'contract IERC20', name: 'wrapped1155', type: 'address' }
-                ],
-                internalType: 'struct IFutarchyProposal.WrappedOutcome',
-                name: '',
-                type: 'tuple'
-            }
+            { internalType: 'address', name: 'wrapped1155', type: 'address' },
+            { internalType: 'bytes', name: 'data', type: 'bytes' }
         ],
         stateMutability: 'view',
         type: 'function'
     }
 ] as const;
+
