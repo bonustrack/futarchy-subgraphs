@@ -339,10 +339,16 @@ export const handleSwap: evm.Writer = async ({ event, source, block }) => {
     const timestamp = Number(block?.timestamp || Math.floor(Date.now() / 1000));
     const blockNum = Number(block?.number || 0);
 
-    // Create swap entity
+    // Create swap entity (check if already exists to prevent duplicates on retry)
     const txHash = (event as any).transactionHash || '';
     const logIndex = (event as any).logIndex || 0;
     const swapId = `${poolId}-${txHash}-${logIndex}`;
+
+    // Skip if already exists (can happen on block retry after error)
+    const existingSwap = await Swap.loadEntity(swapId, indexer);
+    if (existingSwap) {
+        return;
+    }
 
     const swap = new Swap(swapId, indexer);
     swap.chain = chainId;
