@@ -1,9 +1,13 @@
 import { CheckpointConfig } from '@snapshot-labs/checkpoint';
-import { AggregatorAbi, OrganizationAbi, ProposalMetadataAbi } from './abis';
+import { AggregatorAbi, OrganizationAbi, ProposalMetadataAbi, ProposalMetadataFactoryAbi } from './abis';
 
 // Gnosis Chain contract addresses
 const AGGREGATOR_ADDRESS = '0xC5eB43D53e2FE5FddE5faf400CC4167e5b5d4Fc1';
 const AGGREGATOR_START_BLOCK = 38000000;
+
+// ProposalMetadataFactory - directly indexes all proposal creations
+const PROPOSAL_FACTORY_ADDRESS = '0x899c70C37E523C99Bd61993ca434F1c1A82c106d';
+const PROPOSAL_FACTORY_START_BLOCK = 44225271;
 
 export const config: CheckpointConfig = {
     network_node_url: process.env.RPC_URL || 'https://rpc.gnosis.gateway.fm',
@@ -21,6 +25,15 @@ export const config: CheckpointConfig = {
                 { name: 'ExtendedMetadataUpdated(string,string)', fn: 'handleAggregatorMetadataUpdated' },
                 { name: 'EditorSet(address)', fn: 'handleAggregatorEditorSet' }
             ]
+        },
+        // ProposalMetadataFactory - captures ALL proposal creations directly (not via templates)
+        {
+            contract: PROPOSAL_FACTORY_ADDRESS,
+            abi: 'ProposalMetadataFactory',
+            start: PROPOSAL_FACTORY_START_BLOCK,
+            events: [
+                { name: 'ProposalMetadataCreated(address,address)', fn: 'handleProposalMetadataFactoryCreated' }
+            ]
         }
     ],
 
@@ -30,7 +43,7 @@ export const config: CheckpointConfig = {
             abi: 'Organization',
             events: [
                 { name: 'ProposalAdded(address)', fn: 'handleProposalAdded' },
-                { name: 'ProposalCreatedAndAdded(address,string,string)', fn: 'handleProposalCreated' },
+                { name: 'ProposalCreatedAndAdded(address,address)', fn: 'handleProposalCreated' },
                 { name: 'ProposalRemoved(address)', fn: 'handleProposalRemoved' },
                 { name: 'OrganizationInfoUpdated(string,string)', fn: 'handleOrganizationInfoUpdated' },
                 { name: 'ExtendedMetadataUpdated(string,string)', fn: 'handleOrganizationMetadataUpdated' },
@@ -50,6 +63,7 @@ export const config: CheckpointConfig = {
     abis: {
         Aggregator: AggregatorAbi,
         Organization: OrganizationAbi,
-        ProposalMetadata: ProposalMetadataAbi
+        ProposalMetadata: ProposalMetadataAbi,
+        ProposalMetadataFactory: ProposalMetadataFactoryAbi
     }
 };

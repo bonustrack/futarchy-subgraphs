@@ -12,8 +12,7 @@ export const OrganizationAbi = [
         anonymous: false,
         inputs: [
             { indexed: true, internalType: 'address', name: 'proposalMetadata', type: 'address' },
-            { indexed: false, internalType: 'string', name: 'displayNameQuestion', type: 'string' },
-            { indexed: false, internalType: 'string', name: 'displayNameEvent', type: 'string' }
+            { indexed: true, internalType: 'address', name: 'proposalAddress', type: 'address' }
         ],
         name: 'ProposalCreatedAndAdded',
         type: 'event'

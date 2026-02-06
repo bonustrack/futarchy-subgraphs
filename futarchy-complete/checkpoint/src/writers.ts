@@ -187,6 +187,71 @@ export const handleAggregatorEditorSet: evm.Writer = async ({ event }) => {
 };
 
 // ============================================
+// PROPOSAL METADATA FACTORY HANDLERS
+// ============================================
+
+/**
+ * Handles ProposalMetadataCreated events directly from the factory.
+ * This ensures ALL proposals are indexed, not just those captured via org templates.
+ */
+export const handleProposalMetadataFactoryCreated: evm.Writer = async ({ event, blockNumber, helpers }) => {
+    if (!event) return;
+
+    const args = (event as any).args;
+    const metadataAddress = (args?.metadata as string)?.toLowerCase();
+    const tradingAddress = (args?.proposalAddress as string)?.toLowerCase();
+
+    if (!metadataAddress) return;
+
+    try {
+        // Check if proposal already exists (may have been created via org template)
+        const existing = await ProposalEntity.loadEntity(metadataAddress, INDEXER_NAME);
+        if (existing) {
+            console.log(`⏭️ Proposal already exists: ${metadataAddress?.slice(0, 10)}...`);
+            return;
+        }
+
+        // Read proposal data from contract
+        const [title, displayNameEvent, description, metadata, metadataURI, owner, editor] = await Promise.all([
+            client.readContract({ address: metadataAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'displayNameQuestion' }),
+            client.readContract({ address: metadataAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'displayNameEvent' }),
+            client.readContract({ address: metadataAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'description' }),
+            client.readContract({ address: metadataAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'metadata' }),
+            client.readContract({ address: metadataAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'metadataURI' }),
+            client.readContract({ address: metadataAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'owner' }),
+            client.readContract({ address: metadataAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'editor' })
+        ]);
+
+        const proposal = new ProposalEntity(metadataAddress, INDEXER_NAME);
+        proposal.organization = null; // Will be set when ProposalAdded event is processed
+        proposal.owner = (owner as string).toLowerCase();
+        proposal.editor = (editor as string).toLowerCase();
+        proposal.proposalAddress = tradingAddress;
+        proposal.title = title as string;
+        proposal.description = description as string;
+        proposal.metadata = metadata as string;
+        proposal.metadataURI = metadataURI as string;
+        proposal.displayNameEvent = displayNameEvent as string;
+        proposal.displayNameQuestion = title as string;
+        proposal.createdAtTimestamp = Number(blockNumber);
+        await proposal.save();
+
+        // Create metadata entries from JSON metadata
+        await updateMetadataEntries(metadataAddress, 'Proposal', metadata as string);
+
+        // Start listening to proposal metadata updates
+        await helpers.executeTemplate('ProposalMetadata', {
+            contract: metadataAddress,
+            start: blockNumber
+        });
+
+        console.log(`🏭 Factory: Proposal created: ${(title as string)?.slice(0, 50)}...`);
+    } catch (error) {
+        console.error(`❌ Factory: Failed to create proposal ${metadataAddress}:`, error);
+    }
+};
+
+// ============================================
 // ORGANIZATION HANDLERS
 // ============================================
 
@@ -244,13 +309,13 @@ export const handleProposalCreated: evm.Writer = async ({ event, blockNumber, so
 
     const args = (event as any).args;
     const proposalAddress = (args?.proposalMetadata as string)?.toLowerCase();
+    const tradingAddress = (args?.proposalAddress as string)?.toLowerCase(); // Get from event, not contract
     const orgAddress = source?.contract.toLowerCase();
 
     if (!proposalAddress) return;
 
     try {
-        const [tradingAddress, title, displayNameEvent, description, metadata, metadataURI, owner, editor] = await Promise.all([
-            client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'proposalAddress' }),
+        const [title, displayNameEvent, description, metadata, metadataURI, owner, editor] = await Promise.all([
             client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'displayNameQuestion' }),
             client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'displayNameEvent' }),
             client.readContract({ address: proposalAddress as `0x${string}`, abi: ProposalMetadataAbi, functionName: 'description' }),
@@ -264,7 +329,7 @@ export const handleProposalCreated: evm.Writer = async ({ event, blockNumber, so
         proposal.organization = orgAddress || null;
         proposal.owner = (owner as string).toLowerCase();
         proposal.editor = (editor as string).toLowerCase();
-        proposal.proposalAddress = (tradingAddress as string).toLowerCase();
+        proposal.proposalAddress = tradingAddress || (proposalAddress as string); // Use event arg or fallback
         proposal.title = title as string;
         proposal.description = description as string;
         proposal.metadata = metadata as string;
@@ -403,6 +468,7 @@ export const writers = {
     handleAggregatorInfoUpdated,
     handleAggregatorMetadataUpdated,
     handleAggregatorEditorSet,
+    handleProposalMetadataFactoryCreated,
     handleProposalAdded,
     handleProposalCreated,
     handleProposalRemoved,
