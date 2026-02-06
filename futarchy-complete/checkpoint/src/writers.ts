@@ -1,7 +1,7 @@
 import { evm } from '@snapshot-labs/checkpoint';
 import { createPublicClient, http } from 'viem';
 import { gnosis } from 'viem/chains';
-import { Aggregator, Organization, ProposalEntity } from '../.checkpoint/models';
+import { Aggregator, Organization, ProposalEntity, MetadataEntry } from '../.checkpoint/models';
 import { OrganizationAbi, ProposalMetadataAbi } from './abis';
 
 // Viem client for reading contract state
@@ -13,6 +13,60 @@ const client = createPublicClient({
 // Aggregator address constant (same as in config)
 const AGGREGATOR_ADDRESS = '0xc5eb43d53e2fe5fdde5faf400cc4167e5b5d4fc1';
 const INDEXER_NAME = 'gnosis';
+
+// ============================================
+// HELPERS
+// ============================================
+
+/**
+ * Parse JSON metadata and create individual MetadataEntry entities
+ * Mirrors the Graph Node updateMetadataEntries function
+ */
+async function updateMetadataEntries(
+    parentId: string,
+    parentType: 'Aggregator' | 'Organization' | 'Proposal',
+    metadata: string | null | undefined
+): Promise<void> {
+    if (!metadata || metadata.length === 0) return;
+
+    try {
+        const jsonObj = JSON.parse(metadata);
+        if (typeof jsonObj !== 'object' || jsonObj === null) return;
+
+        for (const [key, value] of Object.entries(jsonObj)) {
+            // Convert value to string
+            let strValue = '';
+            if (typeof value === 'string') {
+                strValue = value;
+            } else if (typeof value === 'number') {
+                strValue = value.toString();
+            } else if (typeof value === 'boolean') {
+                strValue = value ? 'true' : 'false';
+            } else {
+                // Skip nested objects/arrays
+                continue;
+            }
+
+            const entryId = `${parentId}-${key}`;
+            const entry = new MetadataEntry(entryId, INDEXER_NAME);
+            entry.key = key;
+            entry.value = strValue;
+
+            if (parentType === 'Aggregator') {
+                entry.aggregator = parentId;
+            } else if (parentType === 'Organization') {
+                entry.organization = parentId;
+            } else if (parentType === 'Proposal') {
+                entry.proposal = parentId;
+            }
+
+            await entry.save();
+        }
+    } catch (error) {
+        // JSON parse failed, skip metadata entries
+        console.log(`⚠️ Failed to parse metadata for ${parentType} ${parentId}`);
+    }
+}
 
 // ============================================
 // AGGREGATOR HANDLERS
@@ -49,6 +103,9 @@ export const handleOrganizationAdded: evm.Writer = async ({ event, blockNumber, 
         org.editor = (editor as string).toLowerCase();
         org.createdAt = Number(blockNumber);
         await org.save();
+
+        // Create metadata entries from JSON metadata
+        await updateMetadataEntries(orgAddress, 'Organization', metadata as string);
 
         // Start listening to the new organization
         await helpers.executeTemplate('Organization', {
@@ -94,6 +151,9 @@ export const handleOrganizationCreated: evm.Writer = async ({ event, blockNumber
         org.editor = (editor as string).toLowerCase();
         org.createdAt = Number(blockNumber);
         await org.save();
+
+        // Create metadata entries from JSON metadata
+        await updateMetadataEntries(orgAddress, 'Organization', metadata as string);
 
         await helpers.executeTemplate('Organization', {
             contract: orgAddress,
@@ -165,6 +225,9 @@ export const handleProposalAdded: evm.Writer = async ({ event, blockNumber, sour
         proposal.createdAtTimestamp = Number(blockNumber);
         await proposal.save();
 
+        // Create metadata entries from JSON metadata
+        await updateMetadataEntries(proposalAddress, 'Proposal', metadata as string);
+
         await helpers.executeTemplate('ProposalMetadata', {
             contract: proposalAddress,
             start: blockNumber
@@ -211,6 +274,9 @@ export const handleProposalCreated: evm.Writer = async ({ event, blockNumber, so
         proposal.createdAtTimestamp = Number(blockNumber);
         await proposal.save();
 
+        // Create metadata entries from JSON metadata
+        await updateMetadataEntries(proposalAddress, 'Proposal', metadata as string);
+
         await helpers.executeTemplate('ProposalMetadata', {
             contract: proposalAddress,
             start: blockNumber
@@ -250,9 +316,13 @@ export const handleOrganizationMetadataUpdated: evm.Writer = async ({ event, sou
     if (orgAddress) {
         const org = await Organization.loadEntity(orgAddress, INDEXER_NAME);
         if (org) {
-            org.metadata = args?.metadata || '';
+            const metadataStr = args?.metadata || '';
+            org.metadata = metadataStr;
             org.metadataURI = args?.metadataURI || '';
             await org.save();
+
+            // Create metadata entries from JSON metadata
+            await updateMetadataEntries(orgAddress, 'Organization', metadataStr);
         }
     }
     console.log(`📦 Organization metadata updated`);
@@ -299,9 +369,13 @@ export const handleProposalMetadataUpdated: evm.Writer = async ({ event, source 
     if (proposalAddress) {
         const proposal = await ProposalEntity.loadEntity(proposalAddress, INDEXER_NAME);
         if (proposal) {
-            proposal.metadata = args?.metadata || '';
+            const metadataStr = args?.metadata || '';
+            proposal.metadata = metadataStr;
             proposal.metadataURI = args?.metadataURI || '';
             await proposal.save();
+
+            // Create metadata entries from JSON metadata
+            await updateMetadataEntries(proposalAddress, 'Proposal', metadataStr);
         }
     }
     console.log(`📦 Proposal metadata updated`);
