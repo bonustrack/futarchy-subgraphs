@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Futarchy Candle Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        surface: { 900: '#0f1117', 800: '#161822', 700: '#1e2030', 600: '#262940' },
+                        accent: { 500: '#6366f1', 400: '#818cf8', 300: '#a5b4fc' },
+                        yes: '#22c55e',
+                        no: '#ef4444'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background: #0f1117;
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+
+        .pool-card {
+            transition: all 0.2s ease;
+        }
+
+        .pool-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.15);
+        }
+
+        .pool-card.active {
+            border-color: #6366f1;
+            background: rgba(99, 102, 241, 0.08);
+        }
+
+        .loader {
+            border: 3px solid #262940;
+            border-top: 3px solid #6366f1;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #161822;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #363a52;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+
+<body class="text-gray-200 min-h-screen">
+
+    <!-- Header -->
+    <header class="border-b border-gray-800 px-6 py-4">
+        <div class="flex items-center justify-between max-w-[1600px] mx-auto">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                    F</div>
+                <h1 class="text-lg font-semibold text-white">Futarchy Candle Explorer</h1>
+            </div>
+            <div id="sync-status" class="text-xs text-gray-500"></div>
+        </div>
+    </header>
+
+    <!-- Filters -->
+    <div class="border-b border-gray-800 px-6 py-4">
+        <div class="max-w-[1600px] mx-auto flex flex-wrap items-end gap-4">
+            <!-- Proposal -->
+            <div class="flex-1 min-w-[300px]">
+                <label class="block text-xs text-gray-400 mb-1.5 uppercase tracking-wider">Proposal Address</label>
+                <input id="proposal-input" type="text" value="0xFb45aE9d8e5874e85b8e23D735EB9718EfEF47Fa"
+                    class="w-full bg-surface-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30"
+                    placeholder="0x...">
+            </div>
+            <!-- Chain -->
+            <div>
+                <label class="block text-xs text-gray-400 mb-1.5 uppercase tracking-wider">Chain</label>
+                <select id="chain-select"
+                    class="bg-surface-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                    <option value="1" selected>Ethereum (1)</option>
+                    <option value="100">Gnosis (100)</option>
+                </select>
+            </div>
+            <!-- Period -->
+            <div>
+                <label class="block text-xs text-gray-400 mb-1.5 uppercase tracking-wider">Period</label>
+                <select id="period-select"
+                    class="bg-surface-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                    <option value="60">1 min</option>
+                    <option value="300">5 min</option>
+                    <option value="900">15 min</option>
+                    <option value="3600" selected>1 hour</option>
+                    <option value="14400">4 hours</option>
+                    <option value="86400">1 day</option>
+                </select>
+            </div>
+            <!-- Load -->
+            <div>
+                <button onclick="loadPools()"
+                    class="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    Load Pools
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="max-w-[1600px] mx-auto flex gap-0 h-[calc(100vh-180px)]">
+        <!-- Pool Sidebar -->
+        <div id="pool-sidebar" class="w-80 border-r border-gray-800 overflow-y-auto p-4 flex-shrink-0">
+            <div id="pool-list" class="space-y-2">
+                <div class="text-center text-gray-500 text-sm py-12">
+                    <p>Enter a proposal address and click <strong>Load Pools</strong></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart Area -->
+        <div class="flex-1 flex flex-col">
+            <!-- Pool Info Bar -->
+            <div id="pool-info" class="px-6 py-3 border-b border-gray-800 flex items-center gap-4 min-h-[52px]">
+                <span class="text-gray-500 text-sm">Select a pool to view candles</span>
+            </div>
+            <!-- Chart Container -->
+            <div id="chart-container" class="flex-1 relative">
+                <div id="chart-placeholder" class="absolute inset-0 flex items-center justify-center text-gray-600">
+                    <div class="text-center">
+                        <svg class="w-16 h-16 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
+                                d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                        </svg>
+                        <p class="text-sm">No chart data</p>
+                    </div>
+                </div>
+                <div id="chart" class="absolute inset-0"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = 'http://localhost:3001/graphql';
+        let chart = null;
+        let candleSeries = null;
+        let currentPool = null;
+
+        async function gql(query) {
+            const res = await fetch(API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query })
+            });
+            const json = await res.json();
+            if (json.errors) throw new Error(json.errors[0].message);
+            return json.data;
+        }
+
+        async function loadPools() {
+            const proposal = document.getElementById('proposal-input').value.trim().toLowerCase();
+            const chain = document.getElementById('chain-select').value;
+            const listEl = document.getElementById('pool-list');
+
+            if (!proposal) return;
+
+            listEl.innerHTML = '<div class="flex justify-center py-12"><div class="loader"></div></div>';
+
+            try {
+                // Get proposal info
+                const proposalId = `${chain}-${proposal}`;
+                const data = await gql(`{
+            proposals(where: { chain: ${chain} }) { id chain marketName address outcomeTokens }
+            pools(where: { chain: ${chain} }) { id chain name type proposal token0 token1 }
+        }`);
+
+                // Find matching proposal
+                const prop = data.proposals.find(p => p.address === proposal);
+                const pools = data.pools.filter(p => p.proposal === proposalId);
+
+                if (!prop && pools.length === 0) {
+                    // Show helpful not-found with sync info
+                    let syncInfo = '';
+                    try {
+                        const meta = await gql(`{ _checkpoints(first: 100) { id } }`);
+                        syncInfo = `<p class="text-gray-500 mt-2 text-xs">Indexed: ${data.proposals.length} proposals, ${data.pools.length} pools</p>
+                            <p class="text-gray-500 text-xs">Checkpoint may still be syncing — proposal might not be indexed yet.</p>`;
+                    } catch (e) {
+                        syncInfo = `<p class="text-gray-500 mt-2 text-xs">${data.proposals.length} proposals, ${data.pools.length} pools indexed</p>`;
+                    }
+                    listEl.innerHTML = `<div class="text-center text-sm py-12">
+                        <p class="text-yellow-400 mb-2">⚠️ Proposal not found</p>
+                        <p class="text-gray-400 font-mono text-xs mb-3">${proposal.slice(0, 14)}...${proposal.slice(-6)}</p>
+                        <p class="text-gray-500">Not yet indexed on chain ${chain}</p>
+                        ${syncInfo}
+                    </div>`;
+                    return;
+                }
+
+                // Show proposal info
+                let html = '';
+                if (prop) {
+                    html += `<div class="mb-4 p-3 bg-surface-800 rounded-lg border border-gray-700">
+                <p class="text-xs text-indigo-400 uppercase tracking-wider mb-1">Proposal</p>
+                <p class="text-sm text-white leading-snug">${prop.marketName || 'Unknown'}</p>
+                <p class="text-xs text-gray-500 font-mono mt-1">${proposal.slice(0, 10)}...${proposal.slice(-6)}</p>
+            </div>`;
+                }
+
+                if (pools.length === 0) {
+                    html += `<div class="text-center text-gray-500 text-sm py-8">No pools found for this proposal</div>`;
+                } else {
+                    html += `<p class="text-xs text-gray-400 mb-3">${pools.length} pools</p>`;
+                    pools.forEach(pool => {
+                        const isYes = pool.name?.includes('YES');
+                        const isNo = pool.name?.includes('NO') && !pool.name?.includes('YES');
+                        const color = isYes ? 'border-green-800 hover:border-green-600' : isNo ? 'border-red-800 hover:border-red-600' : 'border-gray-700 hover:border-gray-500';
+                        const dot = isYes ? '🟢' : isNo ? '🔴' : '⚪';
+
+                        html += `<div class="pool-card p-3 bg-surface-800 rounded-lg border ${color} cursor-pointer" data-pool-id="${pool.id}" onclick="selectPool('${pool.id}', '${pool.name}', '${pool.type}')">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm">${dot}</span>
+                        <span class="text-sm text-white font-medium">${pool.name || pool.id.slice(0, 16)}</span>
+                    </div>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-xs px-1.5 py-0.5 rounded bg-surface-600 text-gray-400">${pool.type || 'DEX'}</span>
+                        <span class="text-xs text-gray-500 font-mono">${pool.id.split('-')[1]?.slice(0, 10)}...</span>
+                    </div>
+                </div>`;
+                    });
+                }
+
+                listEl.innerHTML = html;
+            } catch (err) {
+                listEl.innerHTML = `<div class="text-center text-red-400 text-sm py-12">${err.message}</div>`;
+            }
+        }
+
+        async function selectPool(poolId, poolName, type) {
+            // Highlight active pool
+            document.querySelectorAll('.pool-card').forEach(el => el.classList.remove('active'));
+            const active = document.querySelector(`[data-pool-id="${poolId}"]`);
+            if (active) active.classList.add('active');
+
+            currentPool = poolId;
+            const period = document.getElementById('period-select').value;
+            const periodLabel = document.getElementById('period-select').selectedOptions[0].text;
+
+            // Update info bar
+            const infoEl = document.getElementById('pool-info');
+            infoEl.innerHTML = `
+        <span class="text-white font-medium text-sm">${poolName}</span>
+        <span class="text-xs px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300">${type}</span>
+        <span class="text-xs text-gray-500">${periodLabel} candles</span>
+        <div class="ml-auto"><div class="loader"></div></div>
+    `;
+
+            try {
+                const data = await gql(`{
+            candles(where: { pool: "${poolId}", period: ${period} }, first: 1000) {
+                id time periodStartUnix open high low close volumeToken0 volumeToken1
+            }
+        }`);
+
+                const candles = (data.candles || [])
+                    .map(c => ({
+                        time: Number(c.periodStartUnix || c.time),
+                        open: parseFloat(c.open),
+                        high: parseFloat(c.high),
+                        low: parseFloat(c.low),
+                        close: parseFloat(c.close)
+                    }))
+                    .sort((a, b) => a.time - b.time);
+
+                infoEl.innerHTML = `
+            <span class="text-white font-medium text-sm">${poolName}</span>
+            <span class="text-xs px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300">${type}</span>
+            <span class="text-xs text-gray-500">${periodLabel} · ${candles.length} candles</span>
+            ${candles.length > 0 ? `<span class="text-xs text-gray-400 ml-2">Latest: <span class="text-white font-mono">${candles[candles.length - 1].close.toPrecision(6)}</span></span>` : ''}
+        `;
+
+                renderChart(candles, poolName);
+            } catch (err) {
+                infoEl.innerHTML = `<span class="text-red-400 text-sm">${err.message}</span>`;
+            }
+        }
+
+        function renderChart(candles, title) {
+            const container = document.getElementById('chart');
+            const placeholder = document.getElementById('chart-placeholder');
+
+            if (candles.length === 0) {
+                placeholder.style.display = 'flex';
+                placeholder.innerHTML = `<div class="text-center"><p class="text-sm text-yellow-400">No candles for this period</p><p class="text-xs text-gray-500 mt-1">Try a different timeframe</p></div>`;
+                if (chart) { chart.remove(); chart = null; }
+                return;
+            }
+
+            placeholder.style.display = 'none';
+
+            if (chart) chart.remove();
+
+            chart = LightweightCharts.createChart(container, {
+                width: container.clientWidth,
+                height: container.clientHeight,
+                layout: {
+                    background: { type: 'solid', color: '#0f1117' },
+                    textColor: '#9ca3af',
+                    fontSize: 12
+                },
+                grid: {
+                    vertLines: { color: '#1e2030' },
+                    horzLines: { color: '#1e2030' }
+                },
+                crosshair: {
+                    mode: LightweightCharts.CrosshairMode.Normal,
+                    vertLine: { color: '#6366f1', width: 1, style: 2, labelBackgroundColor: '#6366f1' },
+                    horzLine: { color: '#6366f1', width: 1, style: 2, labelBackgroundColor: '#6366f1' }
+                },
+                rightPriceScale: {
+                    borderColor: '#262940',
+                    scaleMargins: { top: 0.1, bottom: 0.1 }
+                },
+                timeScale: {
+                    borderColor: '#262940',
+                    timeVisible: true,
+                    secondsVisible: false
+                },
+                handleScroll: { vertTouchDrag: false }
+            });
+
+            candleSeries = chart.addCandlestickSeries({
+                upColor: '#22c55e',
+                downColor: '#ef4444',
+                borderDownColor: '#ef4444',
+                borderUpColor: '#22c55e',
+                wickDownColor: '#ef4444',
+                wickUpColor: '#22c55e'
+            });
+
+            candleSeries.setData(candles);
+            chart.timeScale().fitContent();
+
+            // Resize observer
+            const ro = new ResizeObserver(() => {
+                chart?.applyOptions({ width: container.clientWidth, height: container.clientHeight });
+            });
+            ro.observe(container);
+        }
+
+        // Period change reloads chart for current pool
+        document.getElementById('period-select').addEventListener('change', () => {
+            if (currentPool) {
+                const active = document.querySelector('.pool-card.active');
+                const name = active?.querySelector('.text-white.font-medium')?.textContent || '';
+                const dex = active?.querySelector('.bg-surface-600')?.textContent || '';
+                selectPool(currentPool, name, dex);
+            }
+        });
+
+        // Enter key loads pools
+        document.getElementById('proposal-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') loadPools();
+        });
+
+        // Auto-load on page open
+        window.addEventListener('load', () => loadPools());
+    </script>
+</body>
+
+</html>

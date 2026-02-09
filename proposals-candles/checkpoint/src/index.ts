@@ -14,7 +14,21 @@ const schemaPath = path.resolve(__dirname, '..', 'src', 'schema.gql');
 const schema = fs.readFileSync(schemaPath, 'utf8');
 
 const app = express();
+
+// CORS - allow all origins for local development
+app.use((_req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (_req.method === 'OPTIONS') { res.sendStatus(204); return; }
+    next();
+});
+
 app.use(express.json());
+
+// Serve static files (index.html chart viewer)
+const staticDir = path.resolve(__dirname, '..');
+app.use(express.static(staticDir));
 
 // Initialize Checkpoint with unified schema
 const checkpoint = new Checkpoint(schema, {

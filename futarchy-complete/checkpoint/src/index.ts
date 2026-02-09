@@ -25,6 +25,15 @@ checkpoint.addIndexer('gnosis', config, evmIndexer);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// CORS - allow all origins for local development
+app.use((_req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (_req.method === 'OPTIONS') { res.sendStatus(204); return; }
+    next();
+});
+
 // GraphQL endpoint
 app.use('/graphql', checkpoint.graphql);
 
