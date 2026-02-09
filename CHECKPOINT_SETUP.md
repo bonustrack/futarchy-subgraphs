@@ -113,3 +113,134 @@ docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep futarchy
 | `3002` | Registry GraphQL |
 | `5434` | Candles Postgres |
 | `5435` | Registry Postgres |
+
+---
+
+## Schema Differences: Checkpoint vs Old Subgraphs
+
+The unified checkpoint replaces two separate subgraphs with one multichain schema.
+
+### Old Architecture (Separate Subgraphs)
+
+| Subgraph | Chain | DEX | Endpoints |
+|----------|-------|-----|-----------|
+| `algebra-candles` | Gnosis (100) | Algebra | Graph Node |
+| `uniswap-proposals-candles` | Ethereum (1) | Uniswap V3 | Graph Studio |
+
+### New Architecture (Unified Checkpoint)
+
+| Service | Chains | DEXs | Endpoint |
+|---------|--------|------|----------|
+| `proposals-candles` checkpoint | Gnosis + Ethereum | Algebra + Uniswap V3 | `localhost:3001/graphql` |
+
+---
+
+### Key Schema Changes
+
+#### 1. Chain-Prefixed IDs
+
+All entity IDs are now prefixed with the chain ID:
+
+```diff
+# Old (subgraph) — ID is just the address
+- id: "0xf8346e622557763a62cc981187d084695ee296c3"
+
+# New (checkpoint) — ID is chain-address
++ id: "100-0xf8346e622557763a62cc981187d084695ee296c3"
+```
+
+This applies to **all entities**: Proposal, Pool, Candle, Swap.
+
+#### 2. `chain` Field on Every Entity
+
+Every entity now has a `chain: Int!` field (`100` for Gnosis, `1` for Ethereum):
+
+```graphql
+# Checkpoint schema
+type Pool {
+  id: String!      # "100-0xabc..." or "1-0xabc..."
+  chain: Int!      # 100 or 1
+  address: String! # "0xabc..." (raw address without prefix)
+  ...
+}
+```
+
+#### 3. Type Changes (BigDecimal → String, Bytes → String)
+
+| Field | Old Subgraph | Checkpoint |
+|-------|-------------|------------|
+| Prices (`open`, `close`, etc.) | `BigDecimal!` | `String!` |
+| Volume | `BigDecimal!` | `String!` |
+| Addresses (`sender`, `token0`) | `Bytes!` | `String!` |
+| Timestamps | `BigInt!` | `Int!` |
+| IDs | `ID!` | `String!` |
+| `isInverted` | `Boolean!` | `Int!` (0/1) |
+
+#### 4. No Entity Relations (Flat Schema)
+
+Old subgraphs used `@entity` relations:
+```graphql
+# Old — nested entity references
+type Pool {
+  token0: WhitelistedToken!  # Nested object
+  proposal: Proposal         # Nested object
+  candles: [Candle!]! @derivedFrom(field: "pool")
+}
+```
+
+Checkpoint uses flat string references:
+```graphql
+# New — flat string IDs
+type Pool {
+  token0: String!     # "0xabc..."
+  proposal: String    # "100-0xabc..."
+  # No @derivedFrom — query candles separately with where filter
+}
+```
+
+#### 5. New Fields
+
+| Field | Description |
+|-------|-------------|
+| `Pool.dex` | `"ALGEBRA"` or `"UNISWAP_V3"` |
+| `Swap.tokenIn` / `tokenOut` | `"token0"` or `"token1"` (string, not entity ref) |
+
+#### 6. Removed Fields
+
+| Field | Old Subgraph | Checkpoint |
+|-------|-------------|------------|
+| `Candle.volumeUSD` | ✅ | ❌ removed |
+| `Candle.txCount` | ✅ (algebra) | ❌ removed |
+| `Trade.liquidity` | ✅ (algebra) | ❌ removed |
+| `Trade.tick` | ✅ (algebra) | ❌ removed |
+
+---
+
+### Query Migration Examples
+
+**List proposals (old → new):**
+```diff
+# Old (uniswap subgraph)
+- { proposals { id  marketName } }
+
+# New (checkpoint) — filter by chain
++ { proposals(where: { chain: 1 }) { id chain marketName address } }
+```
+
+**Get candles for a pool (old → new):**
+```diff
+# Old — nested via pool entity
+- { candles(where: { pool: "0xabc..." }) { open close } }
+
+# New — chain-prefixed pool ID
++ { candles(where: { pool: "100-0xabc...", period: 3600 }) { open close } }
+```
+
+**Get pools for a proposal (old → new):**
+```diff
+# Old — nested proposal reference
+- { pools(where: { proposal: "0xabc..." }) { name type } }
+
+# New — chain-prefixed proposal ID
++ { pools(where: { proposal: "100-0xabc..." }) { name type chain dex } }
+```
