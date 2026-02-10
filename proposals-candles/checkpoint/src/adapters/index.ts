@@ -61,7 +61,13 @@ export const TYPE_CONDITIONAL = 'CONDITIONAL';
 export const TYPE_UNKNOWN = 'UNKNOWN';
 
 // Candle periods (seconds)
-export const CANDLE_PERIODS = [60, 300, 900, 3600, 14400, 86400];
+// Configurable via CANDLE_PERIODS env var (comma-separated seconds)
+// Default: 3600 (1h only) for fast indexing
+// Full set: CANDLE_PERIODS=60,300,900,3600,14400,86400
+export const CANDLE_PERIODS: number[] = (process.env.CANDLE_PERIODS || '3600')
+    .split(',')
+    .map(s => parseInt(s.trim(), 10))
+    .filter(n => !isNaN(n) && n > 0);
 
 /**
  * Normalize sqrtPriceX96 to decimal price

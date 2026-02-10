@@ -101,6 +101,37 @@ async function start() {
     checkpoint.start().catch(err => {
         console.error('Checkpoint indexer error:', err);
     });
+
+    // Apply unique indexes after tables are created (5s delay for table creation)
+    setTimeout(async () => {
+        try {
+            const { Client } = require('pg');
+            const client = new Client({ connectionString: process.env.DATABASE_URL });
+            await client.connect();
+
+            const tables = ['pools', 'proposals', 'whitelistedtokens', 'candles', 'swaps'];
+            for (const tbl of tables) {
+                try {
+                    await client.query(`
+                        CREATE UNIQUE INDEX IF NOT EXISTS idx_${tbl}_unique_active 
+                        ON ${tbl} (id, _indexer) 
+                        WHERE upper_inf(block_range)
+                    `);
+                    console.log(`✅ Unique index on ${tbl}`);
+                } catch (e: any) {
+                    // Table might not exist yet or index already exists
+                    if (!e.message.includes('does not exist')) {
+                        console.warn(`⚠️ Index on ${tbl}:`, e.message);
+                    }
+                }
+            }
+
+            await client.end();
+            console.log('✅ Unique indexes applied');
+        } catch (err) {
+            console.warn('⚠️ Could not apply unique indexes:', err);
+        }
+    }, 5000);
 }
 
 start().catch((err) => {

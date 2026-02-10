@@ -45,9 +45,7 @@ export const gnosisConfig: CheckpointConfig = {
             abi: 'AlgebraPool',
             events: [
                 { name: 'Initialize(uint160,int24)', fn: 'handleInitialize' },
-                { name: 'Swap(address,address,int256,int256,uint160,uint128,int24)', fn: 'handleSwap' },
-                { name: 'Mint(address,address,int24,int24,uint128,uint256,uint256)', fn: 'handleMint' },
-                { name: 'Burn(address,int24,int24,uint128,uint256,uint256)', fn: 'handleBurn' }
+                { name: 'Swap(address,address,int256,int256,uint160,uint128,int24)', fn: 'handleSwap' }
             ]
         }
     },
@@ -94,9 +92,7 @@ export const mainnetConfig: CheckpointConfig = {
             abi: 'UniswapV3Pool',
             events: [
                 { name: 'Initialize(uint160,int24)', fn: 'handleInitialize' },
-                { name: 'Swap(address,address,int256,int256,uint160,uint128,int24)', fn: 'handleSwap' },
-                { name: 'Mint(address,address,int24,int24,uint128,uint256,uint256)', fn: 'handleMint' },
-                { name: 'Burn(address,int24,int24,uint128,uint256,uint256)', fn: 'handleBurn' }
+                { name: 'Swap(address,address,int256,int256,uint160,uint128,int24)', fn: 'handleSwap' }
             ]
         }
     },

@@ -20,7 +20,8 @@ import {
     convertSqrtPriceX96,
     classifyPool,
     formatPoolName,
-    createId
+    createId,
+    TYPE_UNKNOWN
 } from './adapters';
 
 // Viem clients for each chain
@@ -38,6 +39,116 @@ const getClient = (indexer: string) => indexer === 'mainnet' ? mainnetClient : g
 
 // Track which pools belong to which DEX for swap/mint/burn routing
 const poolDexMap = new Map<string, DexType>();
+// Track unique pool slots: proposal-type-outcomeSide → only 6 per proposal
+const trackedPoolSlots = new Set<string>();
+
+// In-memory pool cache: poolAddress → { indexer, chainId, poolId }
+// Avoids 2 DB reads per swap (was: try mainnet then gnosis fallback)
+interface PoolCacheEntry { indexer: string; chainId: number; poolId: string; }
+const poolCache = new Map<string, PoolCacheEntry | null>();
+
+// ====== DB OPTIMIZATION: In-memory candle cache ======
+// Eliminates Candle.loadEntity reads (1 DB read per swap per period)
+// Candles are aggregated in memory and flushed periodically
+interface CandleState {
+    chain: number;
+    pool: string;
+    time: number;
+    period: number;
+    periodStartUnix: number;
+    block: number;
+    open: string;
+    high: string;
+    low: string;
+    close: string;
+    volumeToken0: string;
+    volumeToken1: string;
+    indexer: string;
+    dirty: boolean;
+}
+const candleCache = new Map<string, CandleState>();
+const SKIP_SWAP_STORAGE = process.env.SKIP_SWAP_STORAGE === 'true';
+const CANDLE_FLUSH_INTERVAL = parseInt(process.env.CANDLE_FLUSH_INTERVAL || '50'); // flush every N swaps
+let swapsSinceFlush = 0;
+
+// Pool state cache: poolId → pool fields (avoids pool.save on every swap)
+interface PoolState {
+    sqrtPrice: string;
+    price: string;
+    liquidity: string;
+    tick: number;
+    volumeToken0: string;
+    volumeToken1: string;
+    dirty: boolean;
+}
+const poolStateCache = new Map<string, PoolState>();
+
+async function flushCandles(): Promise<void> {
+    const dirtyCandles = [...candleCache.entries()].filter(([_, c]) => c.dirty);
+    if (dirtyCandles.length === 0) return;
+
+    for (const [candleId, state] of dirtyCandles) {
+        const candle = new Candle(candleId, state.indexer);
+        candle.chain = state.chain;
+        candle.pool = state.pool;
+        candle.time = state.time;
+        candle.period = state.period;
+        candle.periodStartUnix = state.periodStartUnix;
+        candle.block = state.block;
+        candle.open = state.open;
+        candle.high = state.high;
+        candle.low = state.low;
+        candle.close = state.close;
+        candle.volumeToken0 = state.volumeToken0;
+        candle.volumeToken1 = state.volumeToken1;
+        await candle.save();
+        state.dirty = false;
+    }
+}
+
+async function flushPoolStates(): Promise<void> {
+    for (const [poolId, state] of poolStateCache.entries()) {
+        if (!state.dirty) continue;
+        // Figure out which indexer from the poolId prefix
+        const indexer = poolId.startsWith('1-') ? 'mainnet' : 'gnosis';
+        const pool = await Pool.loadEntity(poolId, indexer);
+        if (!pool) continue;
+        pool.sqrtPrice = state.sqrtPrice;
+        pool.price = state.price;
+        pool.liquidity = state.liquidity;
+        pool.tick = state.tick;
+        pool.volumeToken0 = state.volumeToken0;
+        pool.volumeToken1 = state.volumeToken1;
+        await pool.save();
+        state.dirty = false;
+    }
+}
+
+function lookupPoolCache(poolAddr: string): PoolCacheEntry | null | undefined {
+    return poolCache.get(poolAddr);
+}
+
+async function resolvePool(poolAddr: string): Promise<PoolCacheEntry | null> {
+    const cached = poolCache.get(poolAddr);
+    if (cached !== undefined) return cached; // null = known missing
+
+    let pool = await Pool.loadEntity(`1-${poolAddr}`, 'mainnet');
+    if (pool) {
+        const entry = { indexer: 'mainnet', chainId: 1, poolId: `1-${poolAddr}` };
+        poolCache.set(poolAddr, entry);
+        return entry;
+    }
+
+    pool = await Pool.loadEntity(`100-${poolAddr}`, 'gnosis');
+    if (pool) {
+        const entry = { indexer: 'gnosis', chainId: 100, poolId: `100-${poolAddr}` };
+        poolCache.set(poolAddr, entry);
+        return entry;
+    }
+
+    poolCache.set(poolAddr, null); // Cache miss too
+    return null;
+}
 
 // ============================================================================
 // FUTARCHY PROTOCOL HANDLERS (Shared across chains)
@@ -233,7 +344,41 @@ async function createPoolEntity(
 
     // Classify pool type
     const { type, isInverted, outcomeSide } = classifyPool(wt0.role || '', wt1.role || '');
+
+    // Skip pools with unknown type (e.g. COMPANY+COMPANY, COLLATERAL+COLLATERAL)
+    if (type === TYPE_UNKNOWN) {
+        return;
+    }
+
+    // Verify tokens belong to the same proposal (prevent cross-proposal pool tracking)
+    // For CONDITIONAL pools: both tokens have proposals, they must match
+    // For EXPECTED_VALUE/PREDICTION: one token is COLLATERAL (no proposal), other has proposal
+    const prop0 = wt0.proposal || '';
+    const prop1 = wt1.proposal || '';
+    if (prop0 && prop1 && prop0 !== prop1) {
+        // Outcome tokens from different proposals — skip
+        return;
+    }
+    const proposalId = prop0 || prop1;
+    if (!proposalId) {
+        // No proposal linked — skip
+        return;
+    }
+
     const name = formatPoolName(wt0.symbol || 'T0', wt1.symbol || 'T1', isInverted);
+
+    // Skip if pool already exists (block retries can re-emit the same event)
+    const existingPool = await Pool.loadEntity(poolId, indexer);
+    if (existingPool) {
+        return;
+    }
+
+    // Ensure only ONE pool per proposal+type+outcomeSide combination (max 6 per proposal)
+    const slotKey = `${proposalId}-${type}-${outcomeSide || 'NONE'}`;
+    if (trackedPoolSlots.has(slotKey)) {
+        return;
+    }
+    trackedPoolSlots.add(slotKey);
 
     // Create pool entity
     const pool = new Pool(poolId, indexer);
@@ -253,7 +398,7 @@ async function createPoolEntity(
     pool.outcomeSide = outcomeSide;
     pool.volumeToken0 = '0';
     pool.volumeToken1 = '0';
-    pool.proposal = wt0.proposal || wt1.proposal;
+    pool.proposal = proposalId;
     await pool.save();
 
     // Start tracking pool events via template
@@ -271,25 +416,13 @@ export const handleInitialize: evm.Writer = async ({ event, source }) => {
     if (!event) return;
 
     const poolAddr = (event as any).address?.toLowerCase();
+    const resolved = await resolvePool(poolAddr);
+    if (!resolved) return;
 
-    // Try both chain IDs since template events don't include indexer info
-    // We need to find the existing pool which was created with the correct chain ID
-    let pool = await Pool.loadEntity(`1-${poolAddr}`, 'mainnet');
-    let indexer = 'mainnet';
-    let chainId = 1;
+    const { indexer, chainId, poolId } = resolved;
+    const pool = await Pool.loadEntity(poolId, indexer);
+    if (!pool) return;
 
-    if (!pool) {
-        pool = await Pool.loadEntity(`100-${poolAddr}`, 'gnosis');
-        indexer = 'gnosis';
-        chainId = 100;
-    }
-
-    if (!pool) {
-        console.log(`[unknown] Initialize: Pool ${poolAddr} not found in either chain`);
-        return;
-    }
-
-    // Both Algebra and Uniswap V3 have same event signature
     const args = (event as any).args;
     const sqrtPriceX96 = BigInt((args?.[0] || args?.price || args?.sqrtPriceX96 || 0).toString());
     const tick = Number(args?.[1] || args?.tick || 0);
@@ -308,27 +441,13 @@ export const handleSwap: evm.Writer = async ({ event, source, block }) => {
 
     const poolAddr = (event as any).address?.toLowerCase();
 
-    // Try both chain IDs since template events don't include indexer info
-    let pool = await Pool.loadEntity(`1-${poolAddr}`, 'mainnet');
-    let indexer = 'mainnet';
-    let chainId = 1;
-    let poolId = `1-${poolAddr}`;
+    // Use in-memory cache instead of 2 DB reads per swap
+    const resolved = await resolvePool(poolAddr);
+    if (!resolved) return;
 
-    if (!pool) {
-        pool = await Pool.loadEntity(`100-${poolAddr}`, 'gnosis');
-        indexer = 'gnosis';
-        chainId = 100;
-        poolId = `100-${poolAddr}`;
-    }
-
-    if (!pool) {
-        // Pool not found - skip (might be non-Futarchy pool)
-        return;
-    }
+    const { indexer, chainId, poolId } = resolved;
 
     const args = (event as any).args;
-    const sender = (args?.sender as string)?.toLowerCase() || '';
-    const recipient = (args?.recipient as string)?.toLowerCase() || '';
     const amount0 = BigInt((args?.amount0 || 0).toString());
     const amount1 = BigInt((args?.amount1 || 0).toString());
     const sqrtPriceX96 = BigInt((args?.[4] || args?.price || args?.sqrtPriceX96 || 0).toString());
@@ -338,80 +457,105 @@ export const handleSwap: evm.Writer = async ({ event, source, block }) => {
     const price = convertSqrtPriceX96(sqrtPriceX96);
     const timestamp = Number(block?.timestamp || Math.floor(Date.now() / 1000));
     const blockNum = Number(block?.number || 0);
+    const priceStr = price.toString();
 
-    // Create swap entity (check if already exists to prevent duplicates on retry)
-    const txHash = (event as any).transactionHash || '';
-    const logIndex = (event as any).logIndex || 0;
-    const swapId = `${poolId}-${txHash}-${logIndex}`;
+    // ===== OPTIMIZATION 1: Skip swap storage (saves 1 DB write per swap) =====
+    if (!SKIP_SWAP_STORAGE) {
+        const sender = (args?.sender as string)?.toLowerCase() || '';
+        const recipient = (args?.recipient as string)?.toLowerCase() || '';
+        const txHash = (event as any).transactionHash || '';
+        const logIndex = (event as any).logIndex || 0;
+        const swapId = `${poolId}-${txHash}-${logIndex}`;
 
-    // Skip if already exists (can happen on block retry after error)
-    const existingSwap = await Swap.loadEntity(swapId, indexer);
-    if (existingSwap) {
-        return;
+        const swap = new Swap(swapId, indexer);
+        swap.chain = chainId;
+        swap.transactionHash = txHash;
+        swap.timestamp = timestamp;
+        swap.pool = poolId;
+        swap.sender = sender;
+        swap.recipient = recipient;
+        swap.origin = sender;
+        swap.amount0 = amount0.toString();
+        swap.amount1 = amount1.toString();
+        swap.amountIn = (amount0 < 0n ? (-amount0).toString() : amount0.toString());
+        swap.amountOut = (amount1 < 0n ? (-amount1).toString() : amount1.toString());
+        swap.tokenIn = amount0 > 0n ? 'token0' : 'token1';
+        swap.tokenOut = amount0 > 0n ? 'token1' : 'token0';
+        swap.price = priceStr;
+        await swap.save();
     }
 
-    const swap = new Swap(swapId, indexer);
-    swap.chain = chainId;
-    swap.transactionHash = txHash;
-    swap.timestamp = timestamp;
-    swap.pool = poolId;
-    swap.sender = sender;
-    swap.recipient = recipient;
-    swap.origin = sender;
-    swap.amount0 = amount0.toString();
-    swap.amount1 = amount1.toString();
-    swap.amountIn = (amount0 < 0n ? (-amount0).toString() : amount0.toString());
-    swap.amountOut = (amount1 < 0n ? (-amount1).toString() : amount1.toString());
-    swap.tokenIn = amount0 > 0n ? 'token0' : 'token1';
-    swap.tokenOut = amount0 > 0n ? 'token1' : 'token0';
-    swap.price = price.toString();
-    await swap.save();
+    // ===== OPTIMIZATION 2: Pool state in memory (saves 1 read + 1 write per swap) =====
+    let poolState = poolStateCache.get(poolId);
+    if (!poolState) {
+        // First time: load from DB to seed the cache
+        const pool = await Pool.loadEntity(poolId, indexer);
+        if (!pool) return;
+        poolState = {
+            sqrtPrice: pool.sqrtPrice || '0',
+            price: pool.price || '0',
+            liquidity: pool.liquidity || '0',
+            tick: pool.tick || 0,
+            volumeToken0: pool.volumeToken0 || '0',
+            volumeToken1: pool.volumeToken1 || '0',
+            dirty: false
+        };
+        poolStateCache.set(poolId, poolState);
+    }
+    poolState.sqrtPrice = sqrtPriceX96.toString();
+    poolState.price = priceStr;
+    poolState.liquidity = liquidity.toString();
+    poolState.tick = tick;
+    poolState.volumeToken0 = (BigInt(poolState.volumeToken0) + (amount0 < 0n ? -amount0 : amount0)).toString();
+    poolState.volumeToken1 = (BigInt(poolState.volumeToken1) + (amount1 < 0n ? -amount1 : amount1)).toString();
+    poolState.dirty = true;
 
-    // Update pool
-    pool.sqrtPrice = sqrtPriceX96.toString();
-    pool.price = price.toString();
-    pool.liquidity = liquidity.toString();
-    pool.tick = tick;
-    pool.volumeToken0 = (BigInt(pool.volumeToken0 || '0') + (amount0 < 0n ? -amount0 : amount0)).toString();
-    pool.volumeToken1 = (BigInt(pool.volumeToken1 || '0') + (amount1 < 0n ? -amount1 : amount1)).toString();
-    await pool.save();
+    // ===== OPTIMIZATION 3: Candles in memory (saves 1 read + 1 write per swap per period) =====
+    const absAmount0 = amount0 < 0n ? -amount0 : amount0;
+    const absAmount1 = amount1 < 0n ? -amount1 : amount1;
 
-    // Update candles for each period
     for (const period of CANDLE_PERIODS) {
         const periodStart = Math.floor(timestamp / period) * period;
         const candleId = `${poolId}-${period}-${periodStart}`;
 
-        let candle = await Candle.loadEntity(candleId, indexer);
-        const priceStr = price.toString();
-
+        let candle = candleCache.get(candleId);
         if (!candle) {
-            candle = new Candle(candleId, indexer);
-            candle.chain = chainId;
-            candle.pool = poolId;
-            candle.time = timestamp;
-            candle.period = period;
-            candle.periodStartUnix = periodStart;
-            candle.block = blockNum;
-            candle.open = priceStr;
-            candle.high = priceStr;
-            candle.low = priceStr;
-            candle.close = priceStr;
-            candle.volumeToken0 = '0';
-            candle.volumeToken1 = '0';
+            candle = {
+                chain: chainId,
+                pool: poolId,
+                time: timestamp,
+                period,
+                periodStartUnix: periodStart,
+                block: blockNum,
+                open: priceStr,
+                high: priceStr,
+                low: priceStr,
+                close: priceStr,
+                volumeToken0: '0',
+                volumeToken1: '0',
+                indexer,
+                dirty: true
+            };
+            candleCache.set(candleId, candle);
         } else {
             candle.close = priceStr;
             candle.time = timestamp;
             candle.block = blockNum;
-            if (parseFloat(priceStr) > parseFloat(candle.high || '0')) candle.high = priceStr;
-            if (parseFloat(priceStr) < parseFloat(candle.low || priceStr)) candle.low = priceStr;
+            if (parseFloat(priceStr) > parseFloat(candle.high)) candle.high = priceStr;
+            if (parseFloat(priceStr) < parseFloat(candle.low)) candle.low = priceStr;
+            candle.dirty = true;
         }
-
-        candle.volumeToken0 = (BigInt(candle.volumeToken0 || '0') + (amount0 < 0n ? -amount0 : amount0)).toString();
-        candle.volumeToken1 = (BigInt(candle.volumeToken1 || '0') + (amount1 < 0n ? -amount1 : amount1)).toString();
-        await candle.save();
+        candle.volumeToken0 = (BigInt(candle.volumeToken0) + absAmount0).toString();
+        candle.volumeToken1 = (BigInt(candle.volumeToken1) + absAmount1).toString();
     }
 
-    console.log(`[${indexer}] Swap on ${poolId}: price=${price.toFixed(8)}`);
+    // ===== Periodic flush: write dirty candles + pools to DB =====
+    swapsSinceFlush++;
+    if (swapsSinceFlush >= CANDLE_FLUSH_INTERVAL) {
+        await flushCandles();
+        await flushPoolStates();
+        swapsSinceFlush = 0;
+    }
 };
 
 export const handleMint: evm.Writer = async ({ event, source }) => {
