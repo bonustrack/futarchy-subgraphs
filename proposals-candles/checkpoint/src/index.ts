@@ -34,7 +34,8 @@ app.use(express.static(staticDir));
 const checkpoint = new Checkpoint(schema, {
     dbConnection: process.env.DATABASE_URL,
     logLevel: LogLevel.Info,
-    prettifyLogs: process.env.NODE_ENV !== 'production'
+    prettifyLogs: process.env.NODE_ENV !== 'production',
+    resetOnConfigChange: true
 });
 
 // ============================================================================
@@ -97,8 +98,12 @@ async function start() {
     });
 
     // Start indexers (non-blocking - runs in background)
+    // Graph-Node: setup_store() creates tables before any indexing
+    // checkpoint.reset() ensures tables exist before config checksum check
     console.log('Starting checkpoint indexers...');
-    checkpoint.start().catch(err => {
+    checkpoint.reset().then(() => {
+        return checkpoint.start();
+    }).catch(err => {
         console.error('Checkpoint indexer error:', err);
     });
 
