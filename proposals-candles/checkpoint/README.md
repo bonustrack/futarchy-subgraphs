@@ -15,13 +15,33 @@ curl http://localhost:3001/health
 ```
 
 > [!WARNING]
-> **Ethereum Mainnet Indexing:** The default free RPC (`https://eth.llamarpc.com`) has a **1,000 block limit** per `eth_getLogs` request. This causes errors during initial sync:
+> **RPC Block Range Limits:** Free RPCs have `eth_getLogs` block range limits that can cause errors.
+> The indexer uses `chunk_size` in `src/config.ts` to stay within these limits:
+> - **Gnosis** → `chunk_size: 10000` (QuickNode paid supports 10k; free RPCs vary, 500–2000)
+> - **Mainnet** → `chunk_size: 50000` (Infura paid supports 100k+; free Llama supports ~1k)
+>
+> **For production**, set paid RPC endpoints via environment variables:
+> ```bash
+> GNOSIS_RPC_URL=https://your-quicknode-endpoint.com \
+> MAINNET_RPC_URL=https://mainnet.infura.io/v3/YOUR_KEY \
+> docker compose up -d
 > ```
-> eth_getLogs range is too large, max is 1k blocks
-> ```
-> **Solution:** Use a production RPC (Infura, Alchemy, Quicknode) by setting `MAINNET_RPC_URL` in `.env` or docker-compose.
-> 
-> Gnosis Chain (chain 100) works fine with the default RPC.
+
+## Candle Explorer UI
+
+A built-in web UI for browsing proposals, pools, and candlestick charts.
+
+```bash
+# Serve with live-server (or any static file server)
+npx -y live-server --port=8080 --host=0.0.0.0 .
+```
+
+Open `http://localhost:8080` → enter a proposal address → select a pool → view candlestick charts.
+
+The explorer connects to the GraphQL API at `http://localhost:3001/graphql` and supports:
+- Chain selection (Ethereum / Gnosis)
+- Period selection (1m, 5m, 15m, 1h, 4h, 1d)
+- Pool cards with live prices, outcome side indicators (🟢 YES / 🔴 NO), and `INV` badges for inverted pools
 
 ## GraphQL API
 
@@ -89,7 +109,7 @@ curl -X POST http://localhost:3001/graphql \
   -H "Content-Type: application/json" \
   -d '{"query":"{ pools(where: { dex: \"ALGEBRA\" }) { id name price } }"}'
 
-# Filter by pool type
+# Filter by pool type (EXPECTED_VALUE, CONDITIONAL, PREDICTION)
 curl -X POST http://localhost:3001/graphql \
   -H "Content-Type: application/json" \
   -d '{"query":"{ pools(where: { type: \"EXPECTED_VALUE\" }) { id name outcomeSide } }"}'
@@ -125,11 +145,11 @@ curl -X POST http://localhost:3001/graphql \
 
 | Entity | Key Fields |
 |--------|------------|
-| `Proposal` | `id`, `chain`, `address`, `marketName` |
+| `Proposal` | `id`, `chain`, `address`, `marketName`, `outcomeTokens` |
 | `WhitelistedToken` | `id`, `chain`, `symbol`, `role`, `decimals` |
-| `Pool` | `id`, `chain`, `dex`, `address`, `name`, `price`, `type`, `outcomeSide` |
-| `Candle` | `id`, `pool`, `period`, `time`, `open`, `high`, `low`, `close` |
-| `Swap` | `id`, `pool`, `timestamp`, `price`, `amount0`, `amount1` |
+| `Pool` | `id`, `chain`, `dex`, `address`, `name`, `price`, `type`, `outcomeSide`, **`isInverted`** |
+| `Candle` | `id`, `pool`, `period`, `time`, `open`, `high`, `low`, `close`, `volumeToken0` |
+| `Swap` | `id`, `pool`, `timestamp`, `price`, `amount0`, `amount1`, `sender`, `transactionHash` |
 
 ## Token Roles
 
@@ -142,14 +162,38 @@ curl -X POST http://localhost:3001/graphql \
 | `YES_CURRENCY` | Wrapped YES outcome of currency token |
 | `NO_CURRENCY` | Wrapped NO outcome of currency token |
 
+## Price Inversion (`isInverted`)
+
+In Uniswap V3 / Algebra pools, `token0` and `token1` ordering is determined by contract address sort order, not by the logical "base/quote" relationship. When the currency token (e.g., sDAI) sorts as `token0` and the company token (e.g., GNO) sorts as `token1`, the raw `sqrtPriceX96` gives the *inverse* of the expected price.
+
+The indexer detects this by checking token roles:
+- If `token0` is a `CURRENCY`-type role (`YES_CURRENCY`, `NO_CURRENCY`, `COLLATERAL`) → pool is **inverted**
+- If `token0` is a `COMPANY`-type role → pool is **not inverted** (standard order)
+
+When `isInverted = 1`, the price is automatically inverted (`1/price`) in:
+- `handleInitialize` — initial pool price
+- `handleSwap` — every swap price, candle OHLC data
+
+### Pool Types
+
+| Type | Description | Example |
+|------|-------------|--------|
+| `CONDITIONAL` | Company token vs currency token within an outcome | `YES_GNO / YES_sDAI` |
+| `EXPECTED_VALUE` | Outcome token vs base currency | `YES_GNO / sDAI` |
+| `PREDICTION` | Outcome currency vs base currency | `YES_sDAI / sDAI` |
+
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_URL` | - | PostgreSQL connection string |
-| `GNOSIS_RPC_URL` | `https://rpc.gnosis.gateway.fm` | Gnosis Chain RPC |
-| `MAINNET_RPC_URL` | `https://eth.llamarpc.com` | Ethereum Mainnet RPC |
+| `DATABASE_URL` | *(set in compose)* | PostgreSQL connection string |
+| `GNOSIS_RPC_URL` | `https://rpc.gnosischain.com` | Gnosis Chain RPC (paid recommended) |
+| `MAINNET_RPC_URL` | `https://eth.llamarpc.com` | Ethereum Mainnet RPC (paid recommended) |
 | `RESET` | `false` | Reset database on startup |
+| `CHECKPOINT_BATCH_SIZE` | `200` | Internal batch size |
+| `CANDLE_PERIODS` | `3600` | Candle period in seconds |
+| `SKIP_SWAP_STORAGE` | `false` | Skip storing individual swaps (saves DB space) |
+| `CANDLE_FLUSH_INTERVAL` | `50` | Flush candles to DB every N swaps |
 | `PORT` | `3000` | HTTP server port |
 
 ---

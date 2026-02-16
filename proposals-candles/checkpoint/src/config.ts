@@ -16,7 +16,10 @@ import {
 // Gnosis Chain Configuration (Algebra DEX)
 // ============================================================================
 export const gnosisConfig: CheckpointConfig = {
-    network_node_url: process.env.GNOSIS_RPC_URL || 'https://rpc.gnosis.gateway.fm',
+    // Free RPCs (rpc.gnosischain.com) have low block range limits (~500).
+    // For production, use a paid RPC like QuickNode (supports 10k range).
+    network_node_url: process.env.GNOSIS_RPC_URL || 'https://rpc.gnosischain.com',
+    chunk_size: 10000, // Max eth_getLogs block range per request (QuickNode paid = 10k)
 
     sources: [
         // Futarchy Factory - emits NewProposal when proposals created
@@ -63,7 +66,10 @@ export const gnosisConfig: CheckpointConfig = {
 // Ethereum Mainnet Configuration (Uniswap V3 DEX)
 // ============================================================================
 export const mainnetConfig: CheckpointConfig = {
+    // Free RPCs (eth.llamarpc.com) have ~1k block range limits.
+    // For production, use Infura/Alchemy (supports 50k+ range).
     network_node_url: process.env.MAINNET_RPC_URL || 'https://eth.llamarpc.com',
+    chunk_size: 50000, // Max eth_getLogs block range per request (Infura paid = 50k+)
 
     sources: [
         // Futarchy Factory

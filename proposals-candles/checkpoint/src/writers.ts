@@ -427,9 +427,11 @@ export const handleInitialize: evm.Writer = async ({ event, source }) => {
     const sqrtPriceX96 = BigInt((args?.[0] || args?.price || args?.sqrtPriceX96 || 0).toString());
     const tick = Number(args?.[1] || args?.tick || 0);
     const price = convertSqrtPriceX96(sqrtPriceX96);
+    // Invert price if needed
+    const finalPrice = pool.isInverted ? (price === 0 ? 0 : 1 / price) : price;
 
     pool.sqrtPrice = sqrtPriceX96.toString();
-    pool.price = price.toString();
+    pool.price = finalPrice.toString();
     pool.tick = tick;
     await pool.save();
 
@@ -457,7 +459,34 @@ export const handleSwap: evm.Writer = async ({ event, source, block }) => {
     const price = convertSqrtPriceX96(sqrtPriceX96);
     const timestamp = Number(block?.timestamp || Math.floor(Date.now() / 1000));
     const blockNum = Number(block?.number || 0);
-    const priceStr = price.toString();
+
+    // Invert price if needed
+    // We need to fetch isInverted status from pool cache or DB
+    // Since we have resolved poolId, let's get the isInverted flag
+    // For optimization, let's assume valid pools obey the flag set at creation
+    let isInverted = false;
+    
+    // Quick lookup or DB load
+    let cachedPoolState = poolStateCache.get(poolId);
+    if (cachedPoolState) {
+        // We need to store isInverted in poolStateCache too
+    }
+    
+    // Correction: We need to load the pool entity to know isInverted if it's not cached
+    // Or we can add it to PoolState. Let's start by checking pool existence which we already do via resolvePool
+    // But resolvePool only returns ID/Indexer.
+    // Let's modify PoolState to include isInverted
+    
+    // Easier approach: Just reuse the pool state logic below
+    
+    // Let's invert the price string right here
+    // Note: We need to know if it IS inverted.
+    const poolEntity = await Pool.loadEntity(poolId, indexer);
+    if (!poolEntity) return;
+    
+    isInverted = !!poolEntity.isInverted;
+    const finalPrice = isInverted ? (price === 0 ? 0 : 1 / price) : price;
+    const priceStr = finalPrice.toString();
 
     // ===== OPTIMIZATION 1: Skip swap storage (saves 1 DB write per swap) =====
     if (!SKIP_SWAP_STORAGE) {

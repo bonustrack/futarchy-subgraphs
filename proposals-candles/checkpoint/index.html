@@ -93,7 +93,7 @@
             <!-- Proposal -->
             <div class="flex-1 min-w-[300px]">
                 <label class="block text-xs text-gray-400 mb-1.5 uppercase tracking-wider">Proposal Address</label>
-                <input id="proposal-input" type="text" value="0xFb45aE9d8e5874e85b8e23D735EB9718EfEF47Fa"
+                <input id="proposal-input" type="text" value="0x45e1064348fd8a407d6d1f59fc64b05f633b28fc"
                     class="w-full bg-surface-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30"
                     placeholder="0x...">
             </div>
@@ -102,8 +102,8 @@
                 <label class="block text-xs text-gray-400 mb-1.5 uppercase tracking-wider">Chain</label>
                 <select id="chain-select"
                     class="bg-surface-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
-                    <option value="1" selected>Ethereum (1)</option>
-                    <option value="100">Gnosis (100)</option>
+                    <option value="1">Ethereum (1)</option>
+                    <option value="100" selected>Gnosis (100)</option>
                 </select>
             </div>
             <!-- Period -->
@@ -194,32 +194,21 @@
             listEl.innerHTML = '<div class="flex justify-center py-12"><div class="loader"></div></div>';
 
             try {
-                // Get proposal info
                 const proposalId = `${chain}-${proposal}`;
                 const data = await gql(`{
-            proposals(where: { chain: ${chain} }) { id chain marketName address outcomeTokens }
-            pools(where: { chain: ${chain} }) { id chain name type proposal token0 token1 }
+            proposal(id: "${proposalId}") { id chain marketName address outcomeTokens }
+            pools(where: { proposal: "${proposalId}" }) { id chain name type proposal token0 token1 price isInverted outcomeSide }
         }`);
 
-                // Find matching proposal
-                const prop = data.proposals.find(p => p.address === proposal);
-                const pools = data.pools.filter(p => p.proposal === proposalId);
+                const prop = data.proposal;
+                const pools = data.pools || [];
 
                 if (!prop && pools.length === 0) {
-                    // Show helpful not-found with sync info
-                    let syncInfo = '';
-                    try {
-                        const meta = await gql(`{ _checkpoints(first: 100) { id } }`);
-                        syncInfo = `<p class="text-gray-500 mt-2 text-xs">Indexed: ${data.proposals.length} proposals, ${data.pools.length} pools</p>
-                            <p class="text-gray-500 text-xs">Checkpoint may still be syncing — proposal might not be indexed yet.</p>`;
-                    } catch (e) {
-                        syncInfo = `<p class="text-gray-500 mt-2 text-xs">${data.proposals.length} proposals, ${data.pools.length} pools indexed</p>`;
-                    }
                     listEl.innerHTML = `<div class="text-center text-sm py-12">
                         <p class="text-yellow-400 mb-2">⚠️ Proposal not found</p>
                         <p class="text-gray-400 font-mono text-xs mb-3">${proposal.slice(0, 14)}...${proposal.slice(-6)}</p>
                         <p class="text-gray-500">Not yet indexed on chain ${chain}</p>
-                        ${syncInfo}
+                        <p class="text-gray-500 text-xs mt-2">Checkpoint may still be syncing.</p>
                     </div>`;
                     return;
                 }
@@ -239,18 +228,23 @@
                 } else {
                     html += `<p class="text-xs text-gray-400 mb-3">${pools.length} pools</p>`;
                     pools.forEach(pool => {
-                        const isYes = pool.name?.includes('YES');
-                        const isNo = pool.name?.includes('NO') && !pool.name?.includes('YES');
+                        const isYes = pool.outcomeSide === 'YES';
+                        const isNo = pool.outcomeSide === 'NO';
                         const color = isYes ? 'border-green-800 hover:border-green-600' : isNo ? 'border-red-800 hover:border-red-600' : 'border-gray-700 hover:border-gray-500';
                         const dot = isYes ? '🟢' : isNo ? '🔴' : '⚪';
+                        const priceStr = pool.price ? parseFloat(pool.price).toPrecision(6) : '—';
 
                         html += `<div class="pool-card p-3 bg-surface-800 rounded-lg border ${color} cursor-pointer" data-pool-id="${pool.id}" onclick="selectPool('${pool.id}', '${pool.name}', '${pool.type}')">
-                    <div class="flex items-center gap-2">
-                        <span class="text-sm">${dot}</span>
-                        <span class="text-sm text-white font-medium">${pool.name || pool.id.slice(0, 16)}</span>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm">${dot}</span>
+                            <span class="text-sm text-white font-medium">${pool.name || pool.id.slice(0, 16)}</span>
+                        </div>
+                        <span class="text-xs text-white font-mono">${priceStr}</span>
                     </div>
                     <div class="flex items-center gap-2 mt-1">
                         <span class="text-xs px-1.5 py-0.5 rounded bg-surface-600 text-gray-400">${pool.type || 'DEX'}</span>
+                        ${pool.isInverted ? '<span class="text-xs px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400">INV</span>' : ''}
                         <span class="text-xs text-gray-500 font-mono">${pool.id.split('-')[1]?.slice(0, 10)}...</span>
                     </div>
                 </div>`;
