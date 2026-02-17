@@ -54,6 +54,19 @@ checkpoint.addIndexer('mainnet', mainnetConfig, new evm.EvmIndexer(writers));
 // checkpoint.addIndexer('arbitrum', arbitrumConfig, new evm.EvmIndexer(writers));
 
 // ============================================================================
+// Suppress benign tip-polling errors
+// When at chain tip, checkpoint repeatedly tries to fetch future blocks,
+// producing BlockNotFoundError spam. These are harmless and just noise.
+// ============================================================================
+const originalConsoleError = console.error;
+const suppressedPatterns = ['BlockNotFoundError', 'Block at number', 'reorg detected'];
+console.error = (...args: any[]) => {
+    const msg = args.map(String).join(' ');
+    if (suppressedPatterns.some(p => msg.includes(p))) return;
+    originalConsoleError.apply(console, args);
+};
+
+// ============================================================================
 // API Endpoints
 // ============================================================================
 
@@ -66,6 +79,23 @@ app.get('/health', (_req: Request, res: Response) => {
         status: 'ok',
         chains: ['gnosis', 'mainnet'],
         timestamp: new Date().toISOString()
+    });
+});
+
+// Sync status — shows elapsed time since indexer started
+const syncStartTime = new Date();
+const syncStartFile = path.resolve(__dirname, '..', 'sync-start.txt');
+fs.writeFileSync(syncStartFile, `Sync started: ${syncStartTime.toISOString()}\n`);
+
+app.get('/sync-status', (_req: Request, res: Response) => {
+    const elapsed = Date.now() - syncStartTime.getTime();
+    const hours = Math.floor(elapsed / 3600000);
+    const mins = Math.floor((elapsed % 3600000) / 60000);
+    const secs = Math.floor((elapsed % 60000) / 1000);
+    res.json({
+        started: syncStartTime.toISOString(),
+        elapsed: `${hours}h ${mins}m ${secs}s`,
+        elapsedMs: elapsed
     });
 });
 
@@ -90,6 +120,7 @@ async function start() {
 ╠════════════════════════════════════════════════════════════╣
 ║   GraphQL:  http://localhost:${PORT}/graphql                  ║
 ║   Health:   http://localhost:${PORT}/health                   ║
+║   Sync:     http://localhost:${PORT}/sync-status              ║
 ╠════════════════════════════════════════════════════════════╣
 ║   Chains:   Gnosis (100) | Mainnet (1)                     ║
 ║   DEXs:     Algebra      | Uniswap V3                      ║
@@ -98,8 +129,7 @@ async function start() {
     });
 
     // Start indexers (non-blocking - runs in background)
-    // Graph-Node: setup_store() creates tables before any indexing
-    // checkpoint.reset() ensures tables exist before config checksum check
+    console.log(`Sync started at: ${syncStartTime.toISOString()}`);
     console.log('Starting checkpoint indexers...');
     checkpoint.reset().then(() => {
         return checkpoint.start();

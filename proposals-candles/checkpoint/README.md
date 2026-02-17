@@ -29,7 +29,7 @@ curl http://localhost:3001/health
 
 ## Candle Explorer UI
 
-A built-in web UI for browsing proposals, pools, and candlestick charts.
+A built-in web UI for browsing proposals, pools, candlestick charts, and swap history.
 
 ```bash
 # Serve with live-server (or any static file server)
@@ -42,6 +42,11 @@ The explorer connects to the GraphQL API at `http://localhost:3001/graphql` and 
 - Chain selection (Ethereum / Gnosis)
 - Period selection (1m, 5m, 15m, 1h, 4h, 1d)
 - Pool cards with live prices, outcome side indicators (🟢 YES / 🔴 NO), and `INV` badges for inverted pools
+- **Swap table** below the chart showing recent swaps with:
+  - Timestamp, BUY/SELL direction (color-coded)
+  - Amounts with token symbols (e.g. `142.74 NO_PNK`)
+  - Price at swap time
+  - Clickable transaction hash links (GnosisScan / Etherscan)
 
 ## GraphQL API
 
@@ -132,12 +137,20 @@ curl -X POST http://localhost:3001/graphql \
 
 ### Swaps
 
+Swaps include enriched token information — symbols and decimals are denormalized from the pool's whitelisted tokens at index time, so the frontend doesn't need extra lookups.
+
 ```bash
-# Get recent swaps for a pool
+# Get recent swaps with token symbols
 curl -X POST http://localhost:3001/graphql \
   -H "Content-Type: application/json" \
-  -d '{"query":"{ swaps(where: { pool: \"100-0x...\" }, orderBy: timestamp, orderDirection: desc, first: 50) { id timestamp price amount0 amount1 } }"}'
+  -d '{"query":"{ swaps(where: { pool: \"100-0x...\" }, orderBy: timestamp, orderDirection: desc, first: 50) { id timestamp price amountIn amountOut symbolIn symbolOut decimalsIn decimalsOut tokenIn tokenOut transactionHash } }"}'
 ```
+
+**Swap direction fields:**
+- `tokenIn` / `tokenOut` — which pool token (`token0` or `token1`)
+- `symbolIn` / `symbolOut` — human-readable symbols (e.g. `YES_GNO`, `sDAI`)
+- `decimalsIn` / `decimalsOut` — token decimals (for formatting raw amounts)
+- `amountIn` / `amountOut` — raw amounts following the swap direction (not always `amount0`/`amount1`)
 
 ---
 
@@ -149,7 +162,7 @@ curl -X POST http://localhost:3001/graphql \
 | `WhitelistedToken` | `id`, `chain`, `symbol`, `role`, `decimals` |
 | `Pool` | `id`, `chain`, `dex`, `address`, `name`, `price`, `type`, `outcomeSide`, **`isInverted`** |
 | `Candle` | `id`, `pool`, `period`, `time`, `open`, `high`, `low`, `close`, `volumeToken0` |
-| `Swap` | `id`, `pool`, `timestamp`, `price`, `amount0`, `amount1`, `sender`, `transactionHash` |
+| `Swap` | `id`, `pool`, `timestamp`, `price`, `amount0`, `amount1`, `amountIn`, `amountOut`, `tokenIn`, `tokenOut`, **`symbolIn`**, **`symbolOut`**, **`decimalsIn`**, **`decimalsOut`**, `sender`, `transactionHash` |
 
 ## Token Roles
 
@@ -196,6 +209,40 @@ When `isInverted = 1`, the price is automatically inverted (`1/price`) in:
 | `CANDLE_FLUSH_INTERVAL` | `50` | Flush candles to DB every N swaps |
 | `PORT` | `3000` | HTTP server port |
 
+## Sync Performance
+
+> [!IMPORTANT]
+> **Full sync from start block to chain tip takes approximately 4–5 hours with paid RPCs.**
+
+| Metric | Value |
+|--------|-------|
+| Gnosis start block | ~40,620,034 (contract deployment) |
+| Gnosis tip (as of Feb 2026) | ~44,726,000 |
+| Blocks to index | ~4,100,000 |
+| Sync time (QuickNode paid) | **~4h 49m** |
+| Average rate | ~14,000–22,000 blocks/min |
+| Mainnet sync | Faster (fewer futarchy contracts) |
+
+**Recommended paid RPCs:**
+- **Gnosis:** [QuickNode](https://www.quicknode.com/) xDAI/Gnosis endpoint (supports 10k block range)
+- **Mainnet:** [Infura](https://infura.io/) (supports 100k+ block range)
+
+Free RPCs (`rpc.gnosischain.com`, `eth.llamarpc.com`) work but are significantly slower due to strict rate limits and small block range limits (500–2000 blocks).
+
+## Sync Status & Monitoring
+
+The indexer provides a `/sync-status` endpoint to track sync progress:
+
+```bash
+curl http://localhost:3001/sync-status
+# {"started":"2026-02-17T07:47:49.139Z","elapsed":"4h 49m 12s","elapsedMs":17352000}
+```
+
+The sync start time is also written to `sync-start.txt` for persistent tracking across restarts.
+
+> [!NOTE]
+> **Tip error suppression:** When at the chain tip, Checkpoint produces benign `BlockNotFoundError` and `reorg detected` messages as it polls for new blocks. These are automatically suppressed from console output to reduce log noise. Real errors still appear normally.
+
 ---
 
 ## Restart & Recovery
@@ -232,4 +279,3 @@ RESET=true docker compose up -d
 
 > [!TIP]
 > **Never use `-v` or `RESET=true` unless you want to start over from scratch.** Without these flags, the indexer picks up exactly where it left off.
-

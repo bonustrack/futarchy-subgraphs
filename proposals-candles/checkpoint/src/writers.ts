@@ -44,7 +44,12 @@ const trackedPoolSlots = new Set<string>();
 
 // In-memory pool cache: poolAddress → { indexer, chainId, poolId }
 // Avoids 2 DB reads per swap (was: try mainnet then gnosis fallback)
-interface PoolCacheEntry { indexer: string; chainId: number; poolId: string; }
+interface PoolCacheEntry {
+    indexer: string; chainId: number; poolId: string;
+    isInverted: boolean;
+    token0Symbol: string; token1Symbol: string;
+    token0Decimals: number; token1Decimals: number;
+}
 const poolCache = new Map<string, PoolCacheEntry | null>();
 
 // ====== DB OPTIMIZATION: In-memory candle cache ======
@@ -132,18 +137,25 @@ async function resolvePool(poolAddr: string): Promise<PoolCacheEntry | null> {
     const cached = poolCache.get(poolAddr);
     if (cached !== undefined) return cached; // null = known missing
 
-    let pool = await Pool.loadEntity(`1-${poolAddr}`, 'mainnet');
-    if (pool) {
-        const entry = { indexer: 'mainnet', chainId: 1, poolId: `1-${poolAddr}` };
-        poolCache.set(poolAddr, entry);
-        return entry;
-    }
-
-    pool = await Pool.loadEntity(`100-${poolAddr}`, 'gnosis');
-    if (pool) {
-        const entry = { indexer: 'gnosis', chainId: 100, poolId: `100-${poolAddr}` };
-        poolCache.set(poolAddr, entry);
-        return entry;
+    // Try both chains
+    for (const [indexer, chainId] of [['mainnet', 1], ['gnosis', 100]] as const) {
+        const poolId = `${chainId}-${poolAddr}`;
+        const pool = await Pool.loadEntity(poolId, indexer);
+        if (pool) {
+            // Load token symbols/decimals once and cache
+            const wt0 = await WhitelistedToken.loadEntity(pool.token0 || '', indexer);
+            const wt1 = await WhitelistedToken.loadEntity(pool.token1 || '', indexer);
+            const entry: PoolCacheEntry = {
+                indexer, chainId, poolId,
+                isInverted: !!pool.isInverted,
+                token0Symbol: wt0?.symbol || 'T0',
+                token1Symbol: wt1?.symbol || 'T1',
+                token0Decimals: wt0?.decimals ?? 18,
+                token1Decimals: wt1?.decimals ?? 18,
+            };
+            poolCache.set(poolAddr, entry);
+            return entry;
+        }
     }
 
     poolCache.set(poolAddr, null); // Cache miss too
@@ -443,11 +455,11 @@ export const handleSwap: evm.Writer = async ({ event, source, block }) => {
 
     const poolAddr = (event as any).address?.toLowerCase();
 
-    // Use in-memory cache instead of 2 DB reads per swap
+    // Use in-memory cache — includes isInverted + token symbols/decimals
     const resolved = await resolvePool(poolAddr);
     if (!resolved) return;
 
-    const { indexer, chainId, poolId } = resolved;
+    const { indexer, chainId, poolId, isInverted, token0Symbol, token1Symbol, token0Decimals, token1Decimals } = resolved;
 
     const args = (event as any).args;
     const amount0 = BigInt((args?.amount0 || 0).toString());
@@ -460,33 +472,16 @@ export const handleSwap: evm.Writer = async ({ event, source, block }) => {
     const timestamp = Number(block?.timestamp || Math.floor(Date.now() / 1000));
     const blockNum = Number(block?.number || 0);
 
-    // Invert price if needed
-    // We need to fetch isInverted status from pool cache or DB
-    // Since we have resolved poolId, let's get the isInverted flag
-    // For optimization, let's assume valid pools obey the flag set at creation
-    let isInverted = false;
-    
-    // Quick lookup or DB load
-    let cachedPoolState = poolStateCache.get(poolId);
-    if (cachedPoolState) {
-        // We need to store isInverted in poolStateCache too
-    }
-    
-    // Correction: We need to load the pool entity to know isInverted if it's not cached
-    // Or we can add it to PoolState. Let's start by checking pool existence which we already do via resolvePool
-    // But resolvePool only returns ID/Indexer.
-    // Let's modify PoolState to include isInverted
-    
-    // Easier approach: Just reuse the pool state logic below
-    
-    // Let's invert the price string right here
-    // Note: We need to know if it IS inverted.
-    const poolEntity = await Pool.loadEntity(poolId, indexer);
-    if (!poolEntity) return;
-    
-    isInverted = !!poolEntity.isInverted;
+    // Invert price if needed (from cached pool data — no DB read)
     const finalPrice = isInverted ? (price === 0 ? 0 : 1 / price) : price;
     const priceStr = finalPrice.toString();
+
+    // Determine swap direction and resolve token symbols
+    const isToken0In = amount0 > 0n;
+    const symbolIn = isToken0In ? token0Symbol : token1Symbol;
+    const symbolOut = isToken0In ? token1Symbol : token0Symbol;
+    const decimalsIn = isToken0In ? token0Decimals : token1Decimals;
+    const decimalsOut = isToken0In ? token1Decimals : token0Decimals;
 
     // ===== OPTIMIZATION 1: Skip swap storage (saves 1 DB write per swap) =====
     if (!SKIP_SWAP_STORAGE) {
@@ -506,10 +501,19 @@ export const handleSwap: evm.Writer = async ({ event, source, block }) => {
         swap.origin = sender;
         swap.amount0 = amount0.toString();
         swap.amount1 = amount1.toString();
-        swap.amountIn = (amount0 < 0n ? (-amount0).toString() : amount0.toString());
-        swap.amountOut = (amount1 < 0n ? (-amount1).toString() : amount1.toString());
-        swap.tokenIn = amount0 > 0n ? 'token0' : 'token1';
-        swap.tokenOut = amount0 > 0n ? 'token1' : 'token0';
+        // amountIn/Out must follow the swap direction, not always amount0/amount1
+        swap.amountIn = isToken0In
+            ? amount0.toString()
+            : (amount1 < 0n ? (-amount1).toString() : amount1.toString());
+        swap.amountOut = isToken0In
+            ? (amount1 < 0n ? (-amount1).toString() : amount1.toString())
+            : (amount0 < 0n ? (-amount0).toString() : amount0.toString());
+        swap.tokenIn = isToken0In ? 'token0' : 'token1';
+        swap.tokenOut = isToken0In ? 'token1' : 'token0';
+        swap.symbolIn = symbolIn;
+        swap.symbolOut = symbolOut;
+        swap.decimalsIn = decimalsIn;
+        swap.decimalsOut = decimalsOut;
         swap.price = priceStr;
         await swap.save();
     }

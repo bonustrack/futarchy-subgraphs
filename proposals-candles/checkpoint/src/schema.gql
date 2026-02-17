@@ -72,5 +72,9 @@ type Swap {
   amountOut: String!
   tokenIn: String!
   tokenOut: String!
+  symbolIn: String!
+  symbolOut: String!
+  decimalsIn: Int!
+  decimalsOut: Int!
   price: String!
 }

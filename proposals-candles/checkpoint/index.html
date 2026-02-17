@@ -69,6 +69,14 @@
             background: #363a52;
             border-radius: 3px;
         }
+
+        /* Swap table styles */
+        .swap-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+        .swap-table th { position: sticky; top: 0; background: #161822; padding: 6px 10px; text-align: left; color: #9ca3af; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #262940; z-index: 1; }
+        .swap-table td { padding: 5px 10px; border-bottom: 1px solid #1e2030; white-space: nowrap; }
+        .swap-table tr:hover td { background: rgba(99,102,241,0.05); }
+        .swap-buy { color: #22c55e; }
+        .swap-sell { color: #ef4444; }
     </style>
 </head>
 
@@ -151,7 +159,7 @@
                 <span class="text-gray-500 text-sm">Select a pool to view candles</span>
             </div>
             <!-- Chart Container -->
-            <div id="chart-container" class="flex-1 relative">
+            <div id="chart-container" class="relative" style="height: 55%;">
                 <div id="chart-placeholder" class="absolute inset-0 flex items-center justify-center text-gray-600">
                     <div class="text-center">
                         <svg class="w-16 h-16 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor"
@@ -163,6 +171,31 @@
                     </div>
                 </div>
                 <div id="chart" class="absolute inset-0"></div>
+            </div>
+            <!-- Swap Table -->
+            <div class="border-t border-gray-800" style="height: 45%;">
+                <div class="px-4 py-2 flex items-center justify-between border-b border-gray-800 bg-surface-900">
+                    <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">Recent Swaps</span>
+                    <span id="swap-count" class="text-xs text-gray-500"></span>
+                </div>
+                <div id="swap-table-container" class="overflow-y-auto" style="height: calc(100% - 36px);">
+                    <div id="swap-placeholder" class="flex items-center justify-center h-full text-gray-600 text-sm">
+                        Select a pool to view swaps
+                    </div>
+                    <table id="swap-table" class="swap-table hidden">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Side</th>
+                                <th>Amount In</th>
+                                <th>Amount Out</th>
+                                <th>Price</th>
+                                <th>Tx</th>
+                            </tr>
+                        </thead>
+                        <tbody id="swap-body"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -301,9 +334,86 @@
         `;
 
                 renderChart(candles, poolName);
+                loadSwaps(poolId);
             } catch (err) {
                 infoEl.innerHTML = `<span class="text-red-400 text-sm">${err.message}</span>`;
             }
+        }
+
+        async function loadSwaps(poolId) {
+            const placeholder = document.getElementById('swap-placeholder');
+            const table = document.getElementById('swap-table');
+            const tbody = document.getElementById('swap-body');
+            const countEl = document.getElementById('swap-count');
+
+            placeholder.textContent = 'Loading swaps...';
+            placeholder.classList.remove('hidden');
+            table.classList.add('hidden');
+
+            const chain = document.getElementById('chain-select').value;
+            const explorer = chain === '100' ? 'https://gnosisscan.io/tx/' : 'https://etherscan.io/tx/';
+
+            try {
+                const data = await gql(`{
+                    swaps(where: { pool: "${poolId}" }, first: 200, orderBy: timestamp, orderDirection: desc) {
+                        transactionHash timestamp price
+                        amountIn amountOut tokenIn tokenOut
+                        symbolIn symbolOut decimalsIn decimalsOut
+                    }
+                }`);
+
+                const swaps = data.swaps || [];
+                countEl.textContent = `${swaps.length} swaps`;
+
+                if (swaps.length === 0) {
+                    placeholder.textContent = 'No swaps yet for this pool';
+                    return;
+                }
+
+                placeholder.classList.add('hidden');
+                table.classList.remove('hidden');
+
+                tbody.innerHTML = swaps.map(s => {
+                    const date = new Date(Number(s.timestamp) * 1000);
+                    const timeStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+                    const isBuy = s.tokenIn === 'token1'; // buying token0 with token1
+                    const side = isBuy ? 'BUY' : 'SELL';
+                    const sideClass = isBuy ? 'swap-buy' : 'swap-sell';
+
+                    // Format amounts with decimals
+                    const amtIn = formatAmount(s.amountIn, s.decimalsIn);
+                    const amtOut = formatAmount(s.amountOut, s.decimalsOut);
+                    const priceStr = parseFloat(s.price).toPrecision(6);
+                    const txShort = s.transactionHash.slice(0, 8) + '…' + s.transactionHash.slice(-4);
+
+                    return `<tr>
+                        <td class="text-gray-400">${timeStr}</td>
+                        <td class="${sideClass} font-medium">${side}</td>
+                        <td class="text-gray-300"><span class="text-white">${amtIn}</span> <span class="text-gray-500">${s.symbolIn}</span></td>
+                        <td class="text-gray-300"><span class="text-white">${amtOut}</span> <span class="text-gray-500">${s.symbolOut}</span></td>
+                        <td class="text-gray-300 font-mono">${priceStr}</td>
+                        <td><a href="${explorer}${s.transactionHash}" target="_blank" class="text-indigo-400 hover:text-indigo-300 font-mono">${txShort} ↗</a></td>
+                    </tr>`;
+                }).join('');
+            } catch (err) {
+                placeholder.textContent = 'Error loading swaps: ' + err.message;
+                placeholder.classList.remove('hidden');
+                table.classList.add('hidden');
+            }
+        }
+
+        function formatAmount(raw, decimals) {
+            if (!raw || raw === '0') return '0';
+            const d = decimals || 18;
+            // Convert from wei-like to human readable
+            const str = raw.toString().padStart(d + 1, '0');
+            const intPart = str.slice(0, str.length - d) || '0';
+            const fracPart = str.slice(str.length - d, str.length - d + 4);
+            const num = parseFloat(intPart + '.' + fracPart);
+            if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(2) + 'K';
+            if (num >= 1) return num.toFixed(4);
+            return num.toPrecision(4);
         }
 
         function renderChart(candles, title) {
