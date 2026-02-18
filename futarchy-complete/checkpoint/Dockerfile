@@ -4,9 +4,13 @@ WORKDIR /app
 
 # Install dependencies
 COPY package*.json ./
-RUN npm install
+RUN npm install --ignore-scripts
 
-# Apply patches to node_modules (fixes nested where_ filter bug in checkpoint)
+# Apply Graph-Node style patches (idempotent writes, reorg skip, block range, error resilience)
+COPY scripts/patch-graphnode-style.js scripts/
+RUN node scripts/patch-graphnode-style.js
+
+# Apply nested where_ filter patches
 COPY patches/ node_modules/
 
 # Copy source

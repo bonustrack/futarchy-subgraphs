@@ -12,10 +12,10 @@ services:
       DATABASE_URL: postgres://checkpoint:checkpoint123@registry-postgres:5432/checkpoint_registry
       RPC_URL: https://wild-smart-hill.xdai.quiknode.pro/96b064b961c7affcddaac209d554167d6e920364/
       RESET: ${RESET:-false}
+      GNOSIS_BLOCK_RANGE: ${GNOSIS_BLOCK_RANGE:-10000}
     depends_on:
       registry-postgres:
         condition: service_healthy
-    restart: unless-stopped
     networks:
       - registry-net
 
