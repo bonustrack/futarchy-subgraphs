@@ -10,7 +10,7 @@ services:
     command: sh -c "npx checkpoint generate && npm run dev"
     environment:
       DATABASE_URL: postgres://checkpoint:checkpoint123@registry-postgres:5432/checkpoint_registry
-      RPC_URL: https://rpc.gnosischain.com
+      RPC_URL: ${RPC_URL:-https://rpc.gnosischain.com}
       RESET: ${RESET:-false}
       GNOSIS_BLOCK_RANGE: ${GNOSIS_BLOCK_RANGE:-10000}
     depends_on:
