@@ -3,7 +3,11 @@ services:
     container_name: futarchy-registry-checkpoint
     build: .
     ports:
-      - "3002:3000"
+      - "3003:3000"
+    volumes:
+      - ./src/schema.gql:/app/src/schema.gql
+      - ./resolvers-patched.js:/app/node_modules/@snapshot-labs/checkpoint/dist/src/graphql/resolvers.js
+    command: sh -c "npx checkpoint generate && npm run dev"
     environment:
       DATABASE_URL: postgres://checkpoint:checkpoint123@registry-postgres:5432/checkpoint_registry
       RPC_URL: https://wild-smart-hill.xdai.quiknode.pro/96b064b961c7affcddaac209d554167d6e920364/
