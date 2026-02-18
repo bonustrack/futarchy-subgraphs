@@ -2,7 +2,7 @@ import { evm } from '@snapshot-labs/checkpoint';
 import { createPublicClient, http } from 'viem';
 import { gnosis } from 'viem/chains';
 import { Aggregator, Organization, ProposalEntity, MetadataEntry } from '../.checkpoint/models';
-import { OrganizationAbi, ProposalMetadataAbi } from './abis';
+import { AggregatorAbi, OrganizationAbi, ProposalMetadataAbi } from './abis';
 
 // Viem client for reading contract state
 const client = createPublicClient({
@@ -172,17 +172,95 @@ export const handleOrganizationRemoved: evm.Writer = async ({ event }) => {
     console.log(`🗑️ Organization removed: ${orgAddress}`);
 };
 
-export const handleAggregatorInfoUpdated: evm.Writer = async ({ event }) => {
+// ============================================
+// CREATOR (AGGREGATOR FACTORY) HANDLERS
+// ============================================
+
+/**
+ * Handles AggregatorMetadataCreated events from the Creator (factory) contract.
+ * Creates Aggregator entities and starts listening for aggregator events.
+ * Mirrors the graph-node handleAggregatorCreated handler.
+ */
+export const handleAggregatorCreated: evm.Writer = async ({ event, blockNumber, helpers }) => {
+    if (!event) return;
+
+    const args = (event as any).args;
+    const aggregatorAddress = (args?.metadata as string)?.toLowerCase();
+    const aggregatorName = args?.name as string;
+
+    if (!aggregatorAddress) return;
+
+    try {
+        const [description, metadata, metadataURI, owner] = await Promise.all([
+            client.readContract({ address: aggregatorAddress as `0x${string}`, abi: AggregatorAbi, functionName: 'description' }),
+            client.readContract({ address: aggregatorAddress as `0x${string}`, abi: AggregatorAbi, functionName: 'metadata' }),
+            client.readContract({ address: aggregatorAddress as `0x${string}`, abi: AggregatorAbi, functionName: 'metadataURI' }),
+            client.readContract({ address: aggregatorAddress as `0x${string}`, abi: AggregatorAbi, functionName: 'owner' })
+        ]);
+
+        const agg = new Aggregator(aggregatorAddress, INDEXER_NAME);
+        agg.name = aggregatorName || '';
+        agg.description = (description as string) || '';
+        agg.metadata = (metadata as string) || '';
+        agg.metadataURI = (metadataURI as string) || '';
+        agg.creator = (event as any).transaction?.from?.toLowerCase() || '';
+        agg.owner = ((owner as string) || '').toLowerCase();
+        agg.createdAt = Number(blockNumber);
+        await agg.save();
+
+        // Create metadata entries from JSON metadata
+        await updateMetadataEntries(aggregatorAddress, 'Aggregator', metadata as string);
+
+        console.log(`✅ Aggregator created: ${aggregatorName} (${aggregatorAddress})`);
+    } catch (error) {
+        console.error(`❌ Failed to create aggregator ${aggregatorAddress}:`, error);
+    }
+};
+
+export const handleAggregatorInfoUpdated: evm.Writer = async ({ event, source }) => {
     const args = (event as any)?.args;
+    const aggregatorAddress = source?.contract?.toLowerCase() || AGGREGATOR_ADDRESS;
+
+    if (args?.newName && aggregatorAddress) {
+        const agg = await Aggregator.loadEntity(aggregatorAddress, INDEXER_NAME);
+        if (agg) {
+            agg.name = args.newName;
+            agg.description = args.newDescription || agg.description;
+            await agg.save();
+        }
+    }
     console.log(`📝 Aggregator info updated: ${args?.newName}`);
 };
 
-export const handleAggregatorMetadataUpdated: evm.Writer = async ({ event }) => {
+export const handleAggregatorMetadataUpdated: evm.Writer = async ({ event, source }) => {
+    const args = (event as any)?.args;
+    const aggregatorAddress = source?.contract?.toLowerCase() || AGGREGATOR_ADDRESS;
+
+    if (aggregatorAddress) {
+        const agg = await Aggregator.loadEntity(aggregatorAddress, INDEXER_NAME);
+        if (agg) {
+            const metadataStr = args?.metadata || '';
+            agg.metadata = metadataStr;
+            agg.metadataURI = args?.metadataURI || '';
+            await agg.save();
+
+            await updateMetadataEntries(aggregatorAddress, 'Aggregator', metadataStr);
+        }
+    }
     console.log(`📦 Aggregator metadata updated`);
 };
 
-export const handleAggregatorEditorSet: evm.Writer = async ({ event }) => {
+export const handleAggregatorEditorSet: evm.Writer = async ({ event, source }) => {
     const args = (event as any)?.args;
+    const aggregatorAddress = source?.contract?.toLowerCase() || AGGREGATOR_ADDRESS;
+
+    if (aggregatorAddress && args?.newEditor) {
+        const agg = await Aggregator.loadEntity(aggregatorAddress, INDEXER_NAME);
+        if (agg) {
+            agg.editor = args.newEditor.toLowerCase();
+            await agg.save();
+        }
+    }
     console.log(`✏️ Aggregator editor set: ${args?.newEditor}`);
 };
 
@@ -465,6 +543,7 @@ export const writers = {
     handleOrganizationAdded,
     handleOrganizationCreated,
     handleOrganizationRemoved,
+    handleAggregatorCreated,
     handleAggregatorInfoUpdated,
     handleAggregatorMetadataUpdated,
     handleAggregatorEditorSet,

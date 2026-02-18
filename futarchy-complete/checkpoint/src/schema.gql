@@ -18,7 +18,7 @@ type Aggregator {
 
 type Organization {
   id: String!
-  aggregator: String
+  aggregator: Aggregator
   name: String!
   description: Text!
   metadata: Text
@@ -30,7 +30,7 @@ type Organization {
 
 type ProposalEntity {
   id: String!
-  organization: String
+  organization: Organization
   owner: String
   editor: String
   proposalAddress: String!
@@ -47,7 +47,7 @@ type MetadataEntry {
   id: String!
   key: String!
   value: Text!
-  aggregator: String
-  organization: String
-  proposal: String
+  aggregator: Aggregator
+  organization: Organization
+  proposal: ProposalEntity
 }

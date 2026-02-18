@@ -1,18 +1,31 @@
 import { CheckpointConfig } from '@snapshot-labs/checkpoint';
-import { AggregatorAbi, OrganizationAbi, ProposalMetadataAbi, ProposalMetadataFactoryAbi } from './abis';
+import { AggregatorAbi, CreatorAbi, OrganizationAbi, ProposalMetadataAbi, ProposalMetadataFactoryAbi } from './abis';
 
 // Gnosis Chain contract addresses
 const AGGREGATOR_ADDRESS = '0xC5eB43D53e2FE5FddE5faf400CC4167e5b5d4Fc1';
 const AGGREGATOR_START_BLOCK = 38000000;
 
+// Creator (Aggregator Factory) - creates Aggregator entities
+const CREATOR_ADDRESS = '0xe7C27c932C80D30c9aaA30A856c0062208d269b4';
+const CREATOR_START_BLOCK = 38000000;
+
 // ProposalMetadataFactory - directly indexes all proposal creations
 const PROPOSAL_FACTORY_ADDRESS = '0x899c70C37E523C99Bd61993ca434F1c1A82c106d';
-const PROPOSAL_FACTORY_START_BLOCK = 44225271;
+const PROPOSAL_FACTORY_START_BLOCK = 38000000;
 
 export const config: CheckpointConfig = {
     network_node_url: process.env.RPC_URL || 'https://rpc.gnosis.gateway.fm',
 
     sources: [
+        // Creator (Aggregator Factory) - creates Aggregator entities when new aggregators are deployed
+        {
+            contract: CREATOR_ADDRESS,
+            abi: 'Creator',
+            start: CREATOR_START_BLOCK,
+            events: [
+                { name: 'AggregatorMetadataCreated(address,string)', fn: 'handleAggregatorCreated' }
+            ]
+        },
         {
             contract: AGGREGATOR_ADDRESS,
             abi: 'Aggregator',
@@ -62,6 +75,7 @@ export const config: CheckpointConfig = {
 
     abis: {
         Aggregator: AggregatorAbi,
+        Creator: CreatorAbi,
         Organization: OrganizationAbi,
         ProposalMetadata: ProposalMetadataAbi,
         ProposalMetadataFactory: ProposalMetadataFactoryAbi

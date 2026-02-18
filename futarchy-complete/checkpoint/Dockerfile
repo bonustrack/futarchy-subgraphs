@@ -6,6 +6,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
+# Apply patches to node_modules (fixes nested where_ filter bug in checkpoint)
+COPY patches/ node_modules/
+
 # Copy source
 COPY . .
 
