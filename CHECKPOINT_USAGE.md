@@ -144,9 +144,13 @@ query {
   }
 }
 
-# 1.2 Deep Nested Filtering matching exact Aggregators
+# 1.2 Deep Nested Filtering (Secure Metadata Resolution)
+# Guarantee a snapshot_id is legitimate by restricting the query path 
+# all the way up to the canonical Gnosis DAO aggregator:
+# Metadata -> Proposal -> Organization -> Aggregator
 query {
   metadataentries(where: { 
+    key: "snapshot_id",
     proposal_: { 
       organization_: { 
         aggregator_: { id: "0xc5eb43d53e2fe5fdde5faf400cc4167e5b5d4fc1" } 
@@ -155,6 +159,9 @@ query {
   }) {
     id
     value
+    proposal {
+      id
+    }
   }
 }
 ```
