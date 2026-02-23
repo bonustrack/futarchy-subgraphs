@@ -36,7 +36,8 @@ export const config: CheckpointConfig = {
                 { name: 'OrganizationRemoved(address)', fn: 'handleOrganizationRemoved' },
                 { name: 'AggregatorInfoUpdated(string,string)', fn: 'handleAggregatorInfoUpdated' },
                 { name: 'ExtendedMetadataUpdated(string,string)', fn: 'handleAggregatorMetadataUpdated' },
-                { name: 'EditorSet(address)', fn: 'handleAggregatorEditorSet' }
+                { name: 'EditorSet(address)', fn: 'handleAggregatorEditorSet' },
+                { name: 'OwnershipTransferred(address,address)', fn: 'handleAggregatorOwnershipTransferred' }
             ]
         },
         // ProposalMetadataFactory - captures ALL proposal creations directly (not via templates)
@@ -60,7 +61,8 @@ export const config: CheckpointConfig = {
                 { name: 'ProposalRemoved(address)', fn: 'handleProposalRemoved' },
                 { name: 'OrganizationInfoUpdated(string,string)', fn: 'handleOrganizationInfoUpdated' },
                 { name: 'ExtendedMetadataUpdated(string,string)', fn: 'handleOrganizationMetadataUpdated' },
-                { name: 'EditorSet(address)', fn: 'handleOrganizationEditorSet' }
+                { name: 'EditorSet(address)', fn: 'handleOrganizationEditorSet' },
+                { name: 'OwnershipTransferred(address,address)', fn: 'handleOrganizationOwnershipTransferred' }
             ]
         },
         ProposalMetadata: {
@@ -68,7 +70,8 @@ export const config: CheckpointConfig = {
             events: [
                 { name: 'ProposalInfoUpdated(string,string,string)', fn: 'handleProposalInfoUpdated' },
                 { name: 'ExtendedMetadataUpdated(string,string)', fn: 'handleProposalMetadataUpdated' },
-                { name: 'EditorSet(address)', fn: 'handleProposalEditorSet' }
+                { name: 'EditorSet(address)', fn: 'handleProposalEditorSet' },
+                { name: 'OwnershipTransferred(address,address)', fn: 'handleProposalOwnershipTransferred' }
             ]
         }
     },

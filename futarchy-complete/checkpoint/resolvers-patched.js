@@ -98,6 +98,10 @@ async function queryMulti(parent, args, context, info) {
                 const fieldName = w[0].slice(0, -1);
                 const nestedReturnType = (0, graphql_2.getNonNullType)(currentType.getFields()[fieldName].type);
                 const nestedTableName = (0, database_1.getTableName)(nestedReturnType.name.toLowerCase());
+                
+                // Allow deeply nested joins by utilizing the prefix path
+                const aliasName = `${prefix}_${nestedTableName}`;
+                
                 const fields = Object.values(nestedReturnType.getFields())
                     .filter(field => {
                     const baseType = (0, graphql_2.getNonNullType)(field.type);
@@ -106,25 +110,32 @@ async function queryMulti(parent, args, context, info) {
                         ((0, graphql_1.isListType)(baseType) && !(0, graphql_2.getDerivedFromDirective)(field)));
                 })
                     .map(field => field.name);
-                nestedEntitiesMappings[fieldName] = {
-                    [`${fieldName}.id`]: `${nestedTableName}.id`,
+                
+                // Save the path for deeply nested objects to parse back out
+                // We use prefix + fieldName as the key.
+                const pathPrefix = prefix === tableName ? fieldName : `${prefix}.${fieldName}`;
+                nestedEntitiesMappings[pathPrefix] = {
+                    [`${pathPrefix}.id`]: `${aliasName}.id`,
                     ...Object.fromEntries(fields.map(field => [
-                        `${fieldName}.${field}`,
-                        `${nestedTableName}.${field}`
+                        `${pathPrefix}.${field}`,
+                        `${aliasName}.${field}`
                     ]))
                 };
+                
                 query = query
-                    .columns(nestedEntitiesMappings[fieldName])
-                    .innerJoin(nestedTableName, `${tableName}.${fieldName}`, '=', `${nestedTableName}.id`)
+                    .columns(nestedEntitiesMappings[pathPrefix])
+                    .innerJoin(`${nestedTableName} as ${aliasName}`, `${prefix}.${fieldName}`, '=', `${aliasName}.id`)
                     .whereRaw('?? = ??', [
                     `${tableName}._indexer`,
-                    `${nestedTableName}._indexer`
+                    `${aliasName}._indexer`
                 ]);
-                query = (0, database_1.applyQueryFilter)(query, nestedTableName, {
+                
+                query = (0, database_1.applyQueryFilter)(query, aliasName, {
                     block: args.block,
                     indexer: args.indexer
                 });
-                handleWhere(query, nestedTableName, w[1], nestedReturnType);
+                
+                handleWhere(query, aliasName, w[1], nestedReturnType);
             }
             else {
                 const fieldName = w[0];

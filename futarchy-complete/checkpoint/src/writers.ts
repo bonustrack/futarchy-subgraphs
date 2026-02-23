@@ -264,6 +264,20 @@ export const handleAggregatorEditorSet: evm.Writer = async ({ event, source }) =
     console.log(`✏️ Aggregator editor set: ${args?.newEditor}`);
 };
 
+export const handleAggregatorOwnershipTransferred: evm.Writer = async ({ event, source }) => {
+    const args = (event as any)?.args;
+    const aggregatorAddress = source?.contract?.toLowerCase() || AGGREGATOR_ADDRESS;
+
+    if (aggregatorAddress && args?.newOwner) {
+        const agg = await Aggregator.loadEntity(aggregatorAddress, INDEXER_NAME);
+        if (agg) {
+            agg.owner = args.newOwner.toLowerCase();
+            await agg.save();
+        }
+    }
+    console.log(`👑 Aggregator owner transferred: ${args?.newOwner}`);
+};
+
 // ============================================
 // PROPOSAL METADATA FACTORY HANDLERS
 // ============================================
@@ -485,6 +499,20 @@ export const handleOrganizationEditorSet: evm.Writer = async ({ event, source })
     console.log(`✏️ Organization editor set: ${args?.newEditor}`);
 };
 
+export const handleOrganizationOwnershipTransferred: evm.Writer = async ({ event, source }) => {
+    const args = (event as any)?.args;
+    const orgAddress = source?.contract.toLowerCase();
+
+    if (orgAddress && args?.newOwner) {
+        const org = await Organization.loadEntity(orgAddress, INDEXER_NAME);
+        if (org) {
+            org.owner = args.newOwner.toLowerCase();
+            await org.save();
+        }
+    }
+    console.log(`👑 Organization owner transferred: ${args?.newOwner}`);
+};
+
 // ============================================
 // PROPOSAL HANDLERS
 // ============================================
@@ -538,6 +566,20 @@ export const handleProposalEditorSet: evm.Writer = async ({ event, source }) => 
     console.log(`✏️ Proposal editor set: ${args?.newEditor}`);
 };
 
+export const handleProposalOwnershipTransferred: evm.Writer = async ({ event, source }) => {
+    const args = (event as any)?.args;
+    const proposalAddress = source?.contract.toLowerCase();
+
+    if (proposalAddress && args?.newOwner) {
+        const proposal = await ProposalEntity.loadEntity(proposalAddress, INDEXER_NAME);
+        if (proposal) {
+            proposal.owner = args.newOwner.toLowerCase();
+            await proposal.save();
+        }
+    }
+    console.log(`👑 Proposal owner transferred: ${args?.newOwner}`);
+};
+
 // Export all writers
 export const writers = {
     handleOrganizationAdded,
@@ -556,5 +598,8 @@ export const writers = {
     handleOrganizationEditorSet,
     handleProposalInfoUpdated,
     handleProposalMetadataUpdated,
-    handleProposalEditorSet
+    handleProposalEditorSet,
+    handleAggregatorOwnershipTransferred,
+    handleOrganizationOwnershipTransferred,
+    handleProposalOwnershipTransferred
 };
