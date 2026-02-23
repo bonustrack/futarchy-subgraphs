@@ -103,13 +103,13 @@ RESET=true docker compose up -d
 docker logs -f checkpoint-checkpoint-1        # proposals-candles
 docker logs -f futarchy-registry-checkpoint   # registry
 
-# Check sync status (proposals-candles)
-curl -s http://localhost:3001/graphql -X POST \
+# Check sync status (proposals-candles AMM)
+curl -s https://api.futarchy.fi/candles/graphql -X POST \
   -H "Content-Type: application/json" \
   -d '{"query":"{ proposals { id } }"}' | jq '.data.proposals | length'
 
 # Check sync status (registry)
-curl -s http://localhost:3002/graphql -X POST \
+curl -s https://api.futarchy.fi/registry/graphql -X POST \
   -H "Content-Type: application/json" \
   -d '{"query":"{ organizations { id } }"}' | jq '.data.organizations | length'
 
@@ -123,75 +123,98 @@ docker compose down -v
 
 ---
 
-## Example Queries
+## Example Queries (using `api.futarchy.fi`)
 
-### Proposals Candles (Port 3001)
+### 1. Futarchy Registry (`/registry/graphql`)
 
 ```graphql
-# Get all proposals by chain
-{
-  proposals {
+# 1.1 Get proposal tracking code and address
+query {
+  proposalentities(where: { id: "0xa78a2d5844c653dac60da8a3f9ec958d09a4ee6a" }) {
     id
-    chain
-    address
-    marketName
+    proposalAddress
+    owner
+    organization {
+      id
+      owner
+      aggregator {
+        id
+      }
+    }
   }
 }
 
-# Get pools linked to proposals
-{
-  pools(where: { proposal_not: null }) {
+# 1.2 Deep Nested Filtering matching exact Aggregators
+query {
+  metadataentries(where: { 
+    proposal_: { 
+      organization_: { 
+        aggregator_: { id: "0xc5eb43d53e2fe5fdde5faf400cc4167e5b5d4fc1" } 
+      } 
+    } 
+  }) {
     id
-    name
-    type
-    outcomeSide
-    proposal
-  }
-}
-
-# Get 1-hour candles
-{
-  candles(where: { period: 3600 }, first: 10) {
-    id
-    pool
-    open
-    high
-    low
-    close
+    value
   }
 }
 ```
 
-### Futarchy Registry (Port 3002)
+### 2. Proposals Candles / AMM (`/candles/graphql`)
+
+> **Note:** AMM IDs are prefixed with the Chain ID (e.g., `100-` for Gnosis). Use the `proposalAddress` retrieved from the Registry in Step 1.1, and prepend `100-`.
 
 ```graphql
-# Get organizations
-{
-  organizations {
+# 2.1 Get Trading Pools
+query {
+  pools(where: { 
+    proposal: "100-0x45e1064348fd8a407d6d1f59fc64b05f633b28fc",
+    type: "CONDITIONAL" # Or EXPECTED_VALUE, PREDICTION
+  }) {
     id
-    name
-    owner
+    type
+    outcomeSide  # YES or NO
+    price
+    token0
+    token1
   }
 }
 
-# Get proposals with metadata
-{
-  proposalentities {
+# 2.2 Get Candlestick Price History (Using Pool ID)
+query {
+  candles(
+    first: 10, 
+    where: { pool: "100-0xf8346e622557763a62cc981187d084695ee296c3" }, 
+    orderBy: time, 
+    orderDirection: desc
+  ) {
     id
-    proposalAddress
-    title
-    displayNameEvent
-    organization
+    time
+    open
+    close
   }
 }
 
-# Get metadata entries
-{
-  metadataentries(where: { key: "coingecko_ticker" }) {
-    key
-    value
-    proposal
-    organization
+# 2.3 Get Trade History (Latest Swaps)
+query {
+  swaps(
+    first: 5, 
+    where: { 
+      pool_in: [
+        "100-0xf8346e622557763a62cc981187d084695ee296c3", # YES Pool
+        "100-0x76f78ec457c1b14bcf972f16eae44c7aa21d578f"  # NO Pool
+      ] 
+    }, 
+    orderBy: timestamp, 
+    orderDirection: desc
+  ) {
+    pool
+    timestamp
+    price
+    amountIn
+    amountOut
+    symbolIn
+    symbolOut
+    transactionHash
   }
 }
 ```
